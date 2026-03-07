@@ -24,8 +24,12 @@ function deserialize(data: Record<string, any>): Invoice {
     ...data,
     createdAt: ts(data.createdAt),
     updatedAt: ts(data.updatedAt),
-    sentAt: data.sentAt ? ts(data.sentAt) : undefined,
-    paidAt: data.paidAt ? ts(data.paidAt) : undefined,
+    sentAt:    data.sentAt    ? ts(data.sentAt)    : undefined,
+    paidAt:    data.paidAt    ? ts(data.paidAt)    : undefined,
+    voidedAt:  data.voidedAt  ? ts(data.voidedAt)  : undefined,
+    // Phase 12: payment events array (safe default)
+    paymentEvents: data.paymentEvents ?? [],
+    amountPaid:    data.amountPaid    ?? 0,
   } as Invoice;
 }
 

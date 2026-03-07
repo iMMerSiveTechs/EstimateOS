@@ -1,15 +1,17 @@
 // ─── CustomerListScreen ───────────────────────────────────────────────────
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
+  SafeAreaView, ActivityIndicator, Alert, Modal, KeyboardAvoidingView,
+  Platform, ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Customer } from '../models/types';
+import { Customer, FollowUpStatus, FOLLOW_UP_LABELS } from '../models/types';
 import { CustomerRepository } from '../storage/customers';
 import { makeId } from '../domain/id';
 import { T, radii } from '../theme';
 
+// ─── Quick-create modal (name, phone, email, address only) ────────────────
 function CustomerFormModal({ visible, onSave, onClose }: {
   visible: boolean; onSave: (c: Customer) => void; onClose: () => void;
 }) {
@@ -27,7 +29,13 @@ function CustomerFormModal({ visible, onSave, onClose }: {
     setSaving(true);
     try {
       const now = new Date().toISOString();
-      const c: Customer = { id: makeId(), name: name.trim(), phone: phone.trim() || undefined, email: email.trim() || undefined, address: address.trim() || undefined, createdAt: now, updatedAt: now };
+      const c: Customer = {
+        id: makeId(), name: name.trim(),
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        address: address.trim() || undefined,
+        createdAt: now, updatedAt: now,
+      };
       await CustomerRepository.upsertCustomer(c);
       onSave(c);
       reset();
@@ -53,7 +61,7 @@ function CustomerFormModal({ visible, onSave, onClose }: {
             <TextInput style={fm.input} value={phone} onChangeText={setPhone} placeholder="(555) 555-5555" placeholderTextColor={T.muted} keyboardType="phone-pad" />
             <Text style={fm.label}>Email</Text>
             <TextInput style={fm.input} value={email} onChangeText={setEmail} placeholder="email@example.com" placeholderTextColor={T.muted} keyboardType="email-address" autoCapitalize="none" />
-            <Text style={fm.label}>Address</Text>
+            <Text style={fm.label}>Service Address</Text>
             <TextInput style={[fm.input, fm.inputMulti]} value={address} onChangeText={setAddress} placeholder="Street, City, State ZIP" placeholderTextColor={T.muted} multiline numberOfLines={2} textAlignVertical="top" />
           </View>
         </SafeAreaView>
@@ -72,11 +80,35 @@ const fm = StyleSheet.create({
   inputErr: { borderColor: T.red }, err: { color: T.red, fontSize: 12, marginTop: 4 },
 });
 
+// ─── Filter / sort options ────────────────────────────────────────────────
+
+type SortKey = 'name' | 'recent' | 'next_action';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'name',        label: 'Name A–Z' },
+  { key: 'recent',      label: 'Recent' },
+  { key: 'next_action', label: 'Next Action' },
+];
+
+// Status filters: null = All
+const STATUS_FILTERS: { key: FollowUpStatus | null; label: string }[] = [
+  { key: null,                   label: 'All' },
+  { key: 'lead_new',             label: 'New' },
+  { key: 'follow_up_due',        label: 'Follow-up Due' },
+  { key: 'quote_sent',           label: 'Quote Sent' },
+  { key: 'appointment_scheduled',label: 'Scheduled' },
+  { key: 'won',                  label: 'Won' },
+];
+
+// ─── Main screen ──────────────────────────────────────────────────────────
+
 export function CustomerListScreen({ navigation }: any) {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch]       = useState('');
+  const [loading, setLoading]     = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [sortKey, setSortKey]     = useState<SortKey>('name');
+  const [statusFilter, setStatusFilter] = useState<FollowUpStatus | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,11 +118,40 @@ export function CustomerListScreen({ navigation }: any) {
 
   useFocusEffect(load);
 
-  const filtered = customers.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.phone ?? '').includes(search) ||
-    (c.email ?? '').toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = useMemo(() => {
+    let result = customers;
+
+    // Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        (c.companyName ?? '').toLowerCase().includes(q) ||
+        (c.phone ?? '').includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q) ||
+        (c.address ?? '').toLowerCase().includes(q),
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== null) {
+      result = result.filter(c => c.followUpStatus === statusFilter);
+    }
+
+    // Sort
+    result = [...result].sort((a, b) => {
+      if (sortKey === 'name') return a.name.localeCompare(b.name);
+      if (sortKey === 'recent') return b.updatedAt.localeCompare(a.updatedAt);
+      if (sortKey === 'next_action') {
+        const da = a.nextActionAt ?? '9999';
+        const db2 = b.nextActionAt ?? '9999';
+        return da.localeCompare(db2);
+      }
+      return 0;
+    });
+
+    return result;
+  }, [customers, search, statusFilter, sortKey]);
 
   const deleteCustomer = (id: string, name: string) => {
     Alert.alert('Delete Customer', `Delete ${name}?`, [
@@ -102,10 +163,50 @@ export function CustomerListScreen({ navigation }: any) {
     ]);
   };
 
+  const followUpColor = (status?: FollowUpStatus) => {
+    if (!status) return T.border;
+    if (status === 'won') return T.green;
+    if (status === 'lost') return T.muted;
+    if (status === 'follow_up_due') return T.amber;
+    if (status === 'quote_sent') return T.accent;
+    return T.border;
+  };
+
   return (
     <SafeAreaView style={s.safe}>
+      {/* Search bar */}
       <View style={s.searchWrap}>
-        <TextInput style={s.search} value={search} onChangeText={setSearch} placeholder="Search customers…" placeholderTextColor={T.muted} autoCapitalize="none" />
+        <TextInput
+          style={s.search}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search by name, company, phone…"
+          placeholderTextColor={T.muted}
+          autoCapitalize="none"
+        />
+      </View>
+
+      {/* Status filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={s.filterContent}>
+        {STATUS_FILTERS.map(f => (
+          <TouchableOpacity
+            key={String(f.key)}
+            style={[s.chip, statusFilter === f.key && s.chipActive]}
+            onPress={() => setStatusFilter(f.key)}
+          >
+            <Text style={[s.chipTxt, statusFilter === f.key && s.chipTxtActive]}>{f.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Sort pills */}
+      <View style={s.sortRow}>
+        <Text style={s.sortLabel}>Sort:</Text>
+        {SORT_OPTIONS.map(o => (
+          <TouchableOpacity key={o.key} onPress={() => setSortKey(o.key)} style={[s.sortPill, sortKey === o.key && s.sortPillActive]}>
+            <Text style={[s.sortPillTxt, sortKey === o.key && s.sortPillTxtActive]}>{o.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {loading ? (
@@ -113,9 +214,9 @@ export function CustomerListScreen({ navigation }: any) {
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyIcon}>👤</Text>
-          <Text style={s.emptyTitle}>{search ? 'No matches' : 'No customers yet'}</Text>
+          <Text style={s.emptyTitle}>{search || statusFilter ? 'No matches' : 'No customers yet'}</Text>
           <Text style={s.emptySub}>Add customers to link them to estimates and invoices</Text>
-          {!search && (
+          {!search && !statusFilter && (
             <TouchableOpacity style={s.emptyBtn} onPress={() => setShowCreate(true)}>
               <Text style={s.emptyBtnTxt}>+ Add First Customer</Text>
             </TouchableOpacity>
@@ -125,18 +226,33 @@ export function CustomerListScreen({ navigation }: any) {
         <FlatList
           data={filtered}
           keyExtractor={c => c.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           renderItem={({ item }) => (
-            <TouchableOpacity style={s.row} onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id })}
-              onLongPress={() => deleteCustomer(item.id, item.name)}>
+            <TouchableOpacity
+              style={[s.row, { borderLeftColor: followUpColor(item.followUpStatus), borderLeftWidth: 3 }]}
+              onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id })}
+              onLongPress={() => deleteCustomer(item.id, item.name)}
+            >
               <View style={s.avatar}>
                 <Text style={s.avatarTxt}>{item.name.charAt(0).toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.name}>{item.name}</Text>
+                {item.companyName ? <Text style={s.company}>{item.companyName}</Text> : null}
                 {item.phone && <Text style={s.sub}>{item.phone}</Text>}
                 {item.email && <Text style={s.sub}>{item.email}</Text>}
+                {item.followUpStatus && (
+                  <Text style={[s.statusTag, { color: followUpColor(item.followUpStatus) }]}>
+                    {FOLLOW_UP_LABELS[item.followUpStatus]}
+                  </Text>
+                )}
+                {item.nextActionAt && (
+                  <Text style={s.nextAction}>
+                    Next: {new Date(item.nextActionAt).toLocaleDateString()}
+                    {item.nextActionNote ? ` — ${item.nextActionNote}` : ''}
+                  </Text>
+                )}
               </View>
               <Text style={s.arrow}>›</Text>
             </TouchableOpacity>
@@ -148,15 +264,34 @@ export function CustomerListScreen({ navigation }: any) {
         <Text style={s.fabTxt}>+</Text>
       </TouchableOpacity>
 
-      <CustomerFormModal visible={showCreate} onSave={c => { setCustomers(prev => [c, ...prev]); setShowCreate(false); }} onClose={() => setShowCreate(false)} />
+      <CustomerFormModal
+        visible={showCreate}
+        onSave={c => { setCustomers(prev => [c, ...prev]); setShowCreate(false); }}
+        onClose={() => setShowCreate(false)}
+      />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
-  searchWrap: { padding: 12 },
+  searchWrap: { padding: 12, paddingBottom: 6 },
   search: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.md, color: T.text, padding: 11, fontSize: 15 },
+  // Filter chips
+  filterRow: { flexGrow: 0 },
+  filterContent: { paddingHorizontal: 12, paddingVertical: 6, gap: 8, flexDirection: 'row' },
+  chip: { borderWidth: 1, borderColor: T.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: T.surface },
+  chipActive: { backgroundColor: T.accent, borderColor: T.accent },
+  chipTxt: { color: T.sub, fontSize: 13, fontWeight: '500' },
+  chipTxtActive: { color: '#fff', fontWeight: '700' },
+  // Sort pills
+  sortRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, gap: 6 },
+  sortLabel: { color: T.muted, fontSize: 12 },
+  sortPill: { borderWidth: 1, borderColor: T.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  sortPillActive: { borderColor: T.accentLo, backgroundColor: T.accentLo },
+  sortPillTxt: { color: T.sub, fontSize: 12 },
+  sortPillTxtActive: { color: T.accentHi, fontWeight: '700' },
+  // List
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingBottom: 80 },
   emptyIcon: { fontSize: 48 }, emptyTitle: { color: T.text, fontSize: 18, fontWeight: '700' },
   emptySub: { color: T.sub, fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
@@ -166,7 +301,10 @@ const s = StyleSheet.create({
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: T.accentLo, alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { color: T.accent, fontSize: 18, fontWeight: '700' },
   name: { color: T.text, fontSize: 16, fontWeight: '600' },
+  company: { color: T.sub, fontSize: 12, marginTop: 1 },
   sub: { color: T.sub, fontSize: 13, marginTop: 2 },
+  statusTag: { fontSize: 11, fontWeight: '700', marginTop: 4 },
+  nextAction: { color: T.muted, fontSize: 11, marginTop: 2 },
   arrow: { color: T.sub, fontSize: 22 },
   fab: { position: 'absolute', bottom: 28, right: 20, width: 52, height: 52, borderRadius: 26, backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
   fabTxt: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },

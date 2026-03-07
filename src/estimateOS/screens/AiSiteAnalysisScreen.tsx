@@ -326,6 +326,78 @@ const hi = StyleSheet.create({
   summary:{ color: D.sub, fontSize: 12, lineHeight: 17 },
 });
 
+// ─── Low-confidence follow-up panel ──────────────────────────────────────────
+// Shown inside the ResultModal when one or more adjustments have low confidence.
+// Guides the operator to provide better evidence before applying to the estimate.
+function LowConfidencePanel({ adjustments }: { adjustments: SuggestedAdjustment[] }) {
+  const lowItems = adjustments.filter(
+    a => a.confidence === 'low' || (a.confidenceScore != null && a.confidenceScore < 0.5),
+  );
+  if (lowItems.length === 0) return null;
+
+  // Derive what kind of additional evidence would help
+  const hasQuestionIds = lowItems.some(a => a.questionId);
+  const hasMediaRefs   = lowItems.some(a => a.mediaIndex != null);
+
+  const suggestions: string[] = [];
+  if (hasMediaRefs)   suggestions.push('Upload clearer or closer photos of the flagged areas');
+  if (hasQuestionIds) suggestions.push('Answer the highlighted questions manually to confirm these values');
+  if (lowItems.length > 1) suggestions.push('Add a video walkthrough to provide better site context');
+  suggestions.push('Confirm these items on-site before including them in the final estimate');
+
+  return (
+    <View style={lc.wrap}>
+      <View style={lc.header}>
+        <Text style={lc.icon}>⚠️</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={lc.title}>
+            {lowItems.length} item{lowItems.length === 1 ? '' : 's'} need{lowItems.length === 1 ? 's' : ''} review
+          </Text>
+          <Text style={lc.sub}>AI confidence is low — verify before applying</Text>
+        </View>
+      </View>
+
+      {/* Which items are uncertain */}
+      <View style={lc.itemsWrap}>
+        {lowItems.map((item, i) => (
+          <View key={i} style={lc.lowItem}>
+            <Text style={lc.lowItemBullet}>·</Text>
+            <Text style={lc.lowItemTxt} numberOfLines={2}>{item.label}</Text>
+            {item.confidenceScore != null && (
+              <Text style={lc.lowItemScore}>{Math.round(item.confidenceScore * 100)}%</Text>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {/* Actionable suggestions */}
+      <Text style={lc.suggestionsTitle}>To improve accuracy:</Text>
+      {suggestions.map((s, i) => (
+        <View key={i} style={lc.suggestion}>
+          <Text style={lc.suggestionBullet}>→</Text>
+          <Text style={lc.suggestionTxt}>{s}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+const lc = StyleSheet.create({
+  wrap:             { backgroundColor: D.amberLo, borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: D.amber },
+  header:           { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  icon:             { fontSize: 20, marginTop: 1 },
+  title:            { color: D.amberHi, fontSize: 14, fontWeight: '800' },
+  sub:              { color: D.amber, fontSize: 12, marginTop: 2 },
+  itemsWrap:        { gap: 6, marginBottom: 12 },
+  lowItem:          { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lowItemBullet:    { color: D.amber, fontSize: 16, lineHeight: 19 },
+  lowItemTxt:       { color: D.amberHi, fontSize: 12, flex: 1, lineHeight: 17 },
+  lowItemScore:     { color: D.amber, fontSize: 11, fontWeight: '700', minWidth: 32, textAlign: 'right' },
+  suggestionsTitle: { color: D.amberHi, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  suggestion:       { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  suggestionBullet: { color: D.amberHi, fontSize: 13, fontWeight: '700', marginTop: 1 },
+  suggestionTxt:    { color: D.amber, fontSize: 12, lineHeight: 17, flex: 1 },
+});
+
 // ─── Result Modal ─────────────────────────────────────────────────────────────
 function ResultModal({ record, jobs, visible, onClose, onApply, onCheckpoint }: {
   record: AiAnalysisRecord | null;
@@ -380,6 +452,9 @@ function ResultModal({ record, jobs, visible, onClose, onApply, onCheckpoint }: 
               })}
             </View>
           )}
+
+          {/* Low-confidence follow-up panel */}
+          <LowConfidencePanel adjustments={record.suggestedAdjustments} />
 
           <Text style={rm.sectionLabel}>INSIGHTS ({record.suggestedAdjustments.length})</Text>
           {record.suggestedAdjustments.map((adj, i) => {
