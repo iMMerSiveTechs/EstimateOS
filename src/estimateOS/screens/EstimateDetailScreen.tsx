@@ -154,6 +154,15 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         updatedAt: new Date().toISOString(),
       };
       await InvoiceRepository.upsertInvoice(inv);
+      if (estimate.customerId) {
+        await TimelineRepository.appendEvent({
+          customerId: estimate.customerId,
+          estimateId: estimate.id,
+          invoiceId: inv.id,
+          type: 'invoice_created',
+          note: `Invoice ${inv.invoiceNumber} created`,
+        });
+      }
       navigation.navigate('Invoice', { invoiceId: inv.id });
     } finally {
       setSaving(false);
