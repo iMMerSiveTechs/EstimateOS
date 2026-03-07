@@ -10,6 +10,7 @@ import { AppSettings, AI_CREDITS_LOW_THRESHOLD } from '../models/types';
 import { getSettings, saveSettings } from '../storage/settings';
 import { getCredits } from '../storage/aiCredits';
 import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
+import { deriveCapabilities } from '../services/capabilities';
 import { T, radii } from '../theme';
 
 function useToast() {
@@ -248,7 +249,7 @@ export function SettingsScreen({ navigation }: any) {
       <CreditPurchaseModal
         visible={showCredits}
         onClose={() => setShowCredits(false)}
-        stripeEnabled={settings?.integrations.stripeEnabled ?? false}
+        stripeEnabled={deriveCapabilities(settings).servicePaymentsReady}
         onPurchased={newBal => setCreditBalance(newBal)}
       />
     </SafeAreaView>

@@ -33,6 +33,7 @@ import {
   shouldUseMapGrounding, MAPS_GROUNDING_HINT,
 } from '../domain/aiGuard';
 import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
+import { isStripeReady } from '../services/capabilities';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -635,6 +636,7 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
   const [showHistory, setShowHistory]   = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [stripeConfigured, setStripeConfigured] = useState(false);
   const [annotatingJobId, setAnnotatingJobId] = useState<string | null>(null);
   const [showAnnotate, setShowAnnotate] = useState(false);
   const [jobNotes, setJobNotes]         = useState<Record<string, string>>({});
@@ -645,16 +647,18 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
   const lastJobsRef = useRef<MediaJob[]>([]);
 
   const loadData = useCallback(async () => {
-    const [bal, cs, hist, custom] = await Promise.all([
+    const [bal, cs, hist, custom, stripeOk] = await Promise.all([
       getCredits(),
       getCreditSettings(),
       getAnalysisHistory(),
       loadCustomVerticals(),
+      isStripeReady(),
     ]);
     setCredits(bal);
     setCreditSettings(cs);
     setHistory(hist);
     setAllVerticals(mergeVerticals(ALL_VERTICALS, custom));
+    setStripeConfigured(stripeOk);
   }, []);
 
   useFocusEffect(loadData);
@@ -977,7 +981,7 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
       <CreditPurchaseModal
         visible={showBuyCredits}
         onClose={() => setShowBuyCredits(false)}
-        stripeEnabled={false}
+        stripeEnabled={stripeConfigured}
         onPurchased={newBal => {
           setCredits(prev => prev ? { ...prev, balance: newBal } : { balance: newBal, updatedAt: new Date().toISOString() });
           setShowBuyCredits(false);
