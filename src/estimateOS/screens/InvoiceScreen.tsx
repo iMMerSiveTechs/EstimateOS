@@ -10,6 +10,7 @@ import { Invoice, InvoiceLineItem, InvoicePaymentEvent, INVOICE_STATUS_LABELS } 
 import { InvoiceRepository } from '../storage/invoices';
 import { getBusinessProfile } from '../storage/settings';
 import { TimelineRepository } from '../storage/workflow';
+import { createInvoicePaymentEvent } from '../services/paymentProvider';
 import { makeId } from '../domain/id';
 import { T, radii } from '../theme';
 
@@ -212,7 +213,7 @@ export function InvoiceScreen({ route, navigation }: any) {
 
   const handleRecordPayment = async (event: Omit<InvoicePaymentEvent, 'id'>) => {
     if (!invoice) return;
-    const newEvent: InvoicePaymentEvent = { ...event, id: makeId() };
+    const newEvent = createInvoicePaymentEvent(event.amount, event.method, event.note);
     const newAmountPaid = amountPaid + event.amount;
     const newStatus: Invoice['status'] = newAmountPaid >= total - 0.01 ? 'paid' : 'partially_paid';
     const updated: Invoice = {
