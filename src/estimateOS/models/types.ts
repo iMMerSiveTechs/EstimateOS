@@ -1,10 +1,19 @@
 // ─── Shared TypeScript types for EstimateOS ────────────────────────────────
+// Field names match pricingEngineV2.ts exactly — do not rename.
 
 export const AI_META_PREFIX = '__ai_';
 
 // ─── Primitive answer value ────────────────────────────────────────────────
 
 export type AnswerValue = string | number | boolean | string[] | null;
+
+// ─── Price range ───────────────────────────────────────────────────────────
+
+export interface PriceRange {
+  min: number;
+  max: number;
+  currency: string;
+}
 
 // ─── Intake questions ──────────────────────────────────────────────────────
 
@@ -19,15 +28,30 @@ export interface IntakeQuestion {
   id: string;
   label: string;
   type: IntakeQuestionType;
-  options?: string[];      // for select / multiselect
+  options?: string[];
   required?: boolean;
   placeholder?: string;
-  unit?: string;           // e.g. "sq ft", "linear ft"
+  unit?: string;         // e.g. "sq ft", "linear ft"
   min?: number;
   max?: number;
 }
 
+// ─── Custom intake fields (Phase 2 template editor) ───────────────────────
+
+export type CustomIntakeFieldType = 'text' | 'longtext' | 'number' | 'boolean' | 'select';
+
+export interface CustomIntakeField {
+  id: string;
+  label: string;
+  type: CustomIntakeFieldType;
+  required?: boolean;
+  placeholder?: string;
+  helpText?: string;
+  options?: string[];  // for 'select' type
+}
+
 // ─── Pricing rules ─────────────────────────────────────────────────────────
+// Field names match pricingEngineV2.ts (valueMin/valueMax, unitMin/unitMax, etc.)
 
 export type DriverBucket =
   | 'labor'
@@ -51,8 +75,8 @@ export interface FlatFeeRule {
   id: string;
   label: string;
   bucket: DriverBucket;
-  min: number;
-  max: number;
+  valueMin: number;
+  valueMax: number;
 }
 
 export interface ConditionalAddonRule {
@@ -61,9 +85,10 @@ export interface ConditionalAddonRule {
   label: string;
   bucket: DriverBucket;
   questionId: string;
-  triggerValue: string | boolean;
-  min: number;
-  max: number;
+  triggerValue?: string | boolean;
+  answerValue?: string | boolean;  // legacy alias for triggerValue
+  valueMin: number;
+  valueMax: number;
 }
 
 export interface PerUnitRule {
@@ -72,9 +97,10 @@ export interface PerUnitRule {
   label: string;
   bucket: DriverBucket;
   questionId: string;
-  rateMin: number;
-  rateMax: number;
-  cap?: number;
+  unitMin: number;
+  unitMax: number;
+  unitLabel?: string;  // e.g. "sq ft"
+  unitCap?: number;
 }
 
 export interface TieredRule {
@@ -83,7 +109,13 @@ export interface TieredRule {
   label: string;
   bucket: DriverBucket;
   questionId: string;
-  tiers: Array<{ upTo: number; min: number; max: number }>;
+  tieredData: Array<{
+    label: string;
+    minValue: number;
+    maxValue: number;  // use Infinity for open-ended top tier
+    addMin: number;
+    addMax: number;
+  }>;
 }
 
 export interface AdderRule {
@@ -92,9 +124,10 @@ export interface AdderRule {
   label: string;
   bucket: DriverBucket;
   questionId: string;
-  triggerValue: string | boolean;
-  min: number;
-  max: number;
+  answerValue: string | boolean;
+  triggerValue?: string | boolean;  // alias
+  valueMin: number;
+  valueMax: number;
 }
 
 export interface MultiplierRule {
@@ -103,8 +136,10 @@ export interface MultiplierRule {
   label: string;
   bucket: DriverBucket;
   questionId: string;
-  triggerValue: string | boolean;
-  factor: number;
+  answerValue: string | boolean;
+  triggerValue?: string | boolean;  // alias
+  valueMin: number;  // e.g. 1.15 means ×1.15
+  valueMax: number;
 }
 
 export type PricingRule =
@@ -114,6 +149,8 @@ export type PricingRule =
   | TieredRule
   | AdderRule
   | MultiplierRule;
+
+export type PricingRuleType = PricingRule['type'];
 
 // ─── Vertical / service config ─────────────────────────────────────────────
 
@@ -127,33 +164,38 @@ export interface ServiceConfig {
 export interface VerticalConfig {
   id: string;
   name: string;
-  icon: string;            // emoji or icon name
-  currency: string;        // e.g. 'USD'
-  variancePct: number;     // e.g. 0.15 for ±15%
+  icon: string;
+  currency: string;
+  variancePct: number;
   services: ServiceConfig[];
   pricingRules: PricingRule[];
   intakeQuestions: IntakeQuestion[];
   disclaimerText?: string;
-  isCustom?: boolean;      // true for user-created verticals
+  isCustom?: boolean;
 }
 
-// ─── Price drivers ─────────────────────────────────────────────────────────
+// ─── Price drivers (engine output) ────────────────────────────────────────
+// Field names match pricingEngineV2.ts exactly.
 
 export interface PriceDriver {
   id: string;
   label: string;
+  minImpact: number;
+  maxImpact: number;
   bucket: DriverBucket;
-  min: number;
-  max: number;
-  isOverridden?: boolean;
-  isDisabled?: boolean;
-  isManual?: boolean;
+  triggeredBy: string;
+  explanation: string;
+  editable: boolean;
+  overrideMin?: number;
+  overrideMax?: number;
+  disabled?: boolean;
 }
 
 export interface BucketSummary {
   bucket: DriverBucket;
-  min: number;
-  max: number;
+  totalMin: number;
+  totalMax: number;
+  drivers: PriceDriver[];
 }
 
 // ─── Overrides ─────────────────────────────────────────────────────────────
@@ -167,7 +209,7 @@ export interface DriverOverride {
 
 export type DriverOverrideMap = Record<string, DriverOverride>;
 
-// ─── Manual line items ─────────────────────────────────────────────────────
+// ─── Line items (manual additions) ────────────────────────────────────────
 
 export interface LineItem {
   id: string;
@@ -175,29 +217,42 @@ export interface LineItem {
   bucket: DriverBucket;
   min: number;
   max: number;
+  note?: string;
 }
 
-// ─── AI scan history ───────────────────────────────────────────────────────
+// ─── Material library & per-estimate material rows ────────────────────────
 
-export interface AiObservation {
-  questionId: string;
-  suggestedValue: AnswerValue;
-  confidence: number;      // 0–1
-  evidence?: string;       // human-readable explanation
-  boundingBox?: {          // optional image annotation
-    x: number; y: number; width: number; height: number;
-    imageIndex: number;
-  };
-}
-
-export interface AiScanRecord {
+export interface Material {
   id: string;
-  estimateId: string;
-  scannedAt: string;       // ISO timestamp
-  mediaCount: number;
-  focusNote?: string;
-  observations: AiObservation[];
-  preApplicationSnapshot: Record<string, AnswerValue>;
+  name: string;
+  unit: string;         // e.g. "sq ft", "each", "bundle"
+  unitCost: number;
+  vendor?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaterialLineItem {
+  id: string;
+  materialId?: string;  // from library; omit for custom entries
+  name: string;
+  unit: string;
+  unitCost: number;
+  quantity: number;
+  vendor?: string;
+}
+
+// ─── Customer ──────────────────────────────────────────────────────────────
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Estimates ─────────────────────────────────────────────────────────────
@@ -207,26 +262,159 @@ export type EstimateStatus = 'draft' | 'pending' | 'accepted' | 'rejected';
 export interface Estimate {
   id: string;
   status: EstimateStatus;
-  customerName: string;
-  customerEmail?: string;
-  customerPhone?: string;
-  address?: string;
-  notes?: string;
+  estimateNumber?: string;        // e.g. "EST-0042"
+  customerId?: string;            // linked Customer id
+  customer: {
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+  };
   verticalId: string;
   serviceId: string;
   intakeAnswers: Record<string, AnswerValue>;
-  overrides: DriverOverrideMap;
-  manualLineItems: LineItem[];
-  createdAt: string;       // ISO timestamp
-  updatedAt: string;       // ISO timestamp
-  aiScanIds?: string[];    // references to AiScanRecord IDs
+  lineItems: LineItem[];
+  materialLineItems?: MaterialLineItem[];
+  computedRange: PriceRange;
+  drivers: PriceDriver[];
+  driverOverrides?: DriverOverrideMap;
+  disclaimerText?: string;
+  photos: string[];               // local URIs or remote URLs
+  aiScanIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Invoices ──────────────────────────────────────────────────────────────
+
+export type InvoiceStatus = 'draft' | 'sent' | 'paid';
+
+export interface InvoiceLineItem {
+  id: string;
+  label: string;
+  unitCost: number;
+  quantity: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;          // e.g. "INV-0012"
+  estimateId?: string;
+  customerId?: string;
+  customer: {
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+  };
+  status: InvoiceStatus;
+  lineItems: InvoiceLineItem[];
+  taxRate: number;                // 0.08 = 8%
+  paymentTerms: string;           // e.g. "Due on receipt", "Net 30"
+  notes?: string;
+  sentAt?: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Settings ──────────────────────────────────────────────────────────────
+
+export interface BusinessProfile {
+  businessName: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  termsAndConditions?: string;
+  logoUri?: string;
+}
+
+export interface ExportSettings {
+  estimatePrefix: string;       // e.g. "EST-"
+  invoicePrefix: string;        // e.g. "INV-"
+  nextEstimateNumber: number;
+  nextInvoiceNumber: number;
+}
+
+export interface PricingDefaults {
+  overheadPct: number;          // e.g. 0.15
+  profitPct: number;            // e.g. 0.20
+  taxPct: number;               // e.g. 0.08
+  travelFee: number;            // flat $ amount
+}
+
+export interface QualityPreset {
+  id: 'good' | 'better' | 'best';
+  label: string;
+  description?: string;
+  multiplier: number;           // e.g. 1.0, 1.15, 1.35
+}
+
+export interface AiFeatureSettings {
+  advancedReasoning: boolean;
+  analyzeImages: boolean;
+  videoUnderstanding: boolean;  // stub — "coming soon"
+  chatbot: boolean;             // stub — "coming soon"
+}
+
+export interface IntegrationSettings {
+  gemini: boolean;              // stub
+  googleMaps: boolean;          // stub
+  voiceInput: boolean;          // stub
+  imageCreation: boolean;       // stub
+  cloudSync: boolean;           // Firebase — already connected
+}
+
+export interface EmailTemplate {
+  subject: string;
+  body: string;
+}
+
+export interface AppSettings {
+  businessProfile: BusinessProfile;
+  exportSettings: ExportSettings;
+  pricingDefaults: PricingDefaults;
+  presets: QualityPreset[];
+  aiFeatures: AiFeatureSettings;
+  integrations: IntegrationSettings;
+  emailTemplate: EmailTemplate;
+}
+
+// ─── Service templates (Phase 2 template editor) ──────────────────────────
+
+export interface ServiceTemplate {
+  id: string;                   // `${verticalId}_${serviceId}`
+  verticalId: string;
+  serviceId: string;
+  customIntakeFields: CustomIntakeField[];
+  materialDefaults: Array<{ materialId: string; defaultQty: number }>;
+  updatedAt: string;
+}
+
+// ─── AI scan history ───────────────────────────────────────────────────────
+
+export interface EvidenceEntry {
+  value: AnswerValue;
+  confidence?: number;          // 0–1
+  evidence?: string;
+  mediaIndex?: number;
+  boundingBox?: [number, number, number, number];
+}
+
+export interface AiScanRecord {
+  id: string;
+  estimateId: string;
+  createdAt: string;            // ISO timestamp
+  summary: string;
+  answersSnapshot: Record<string, AnswerValue>;
+  evidenceByQuestion: Record<string, EvidenceEntry>;
 }
 
 // ─── AI credits / analysis history ────────────────────────────────────────
 
 export interface CreditBalance {
   balance: number;
-  updatedAt: string;       // ISO timestamp
+  updatedAt: string;
 }
 
 export interface AnalysisRecord {
