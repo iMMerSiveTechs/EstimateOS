@@ -9,6 +9,7 @@ import {
   SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getSettings, saveSettings } from '../storage/settings';
 import { T, radii } from '../theme';
 
 export const ONBOARDING_KEY = '@estimateos_onboarding_v1';
@@ -93,6 +94,27 @@ export function OnboardingScreen({ onComplete }: Props) {
         completedAt: new Date().toISOString(),
       };
       await AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(data));
+
+      // Persist into Firestore AppSettings so business profile + prefixes
+      // are immediately available to all screens without extra setup.
+      try {
+        const settings = await getSettings();
+        settings.businessProfile = {
+          ...settings.businessProfile,
+          businessName: data.companyName,
+          phone:        data.phone || settings.businessProfile.phone,
+          email:        data.email || settings.businessProfile.email,
+          website:      data.website || settings.businessProfile.website,
+          address:      [data.city, data.state].filter(Boolean).join(', ') || settings.businessProfile.address,
+        };
+        settings.exportSettings = {
+          ...settings.exportSettings,
+          estimatePrefix: data.estimatePrefix + '-',
+          invoicePrefix:  data.invoicePrefix + '-',
+        };
+        await saveSettings(settings);
+      } catch { /* non-fatal: user can always update via SettingsScreen */ }
+
       onComplete(data);
     } finally {
       setSaving(false);

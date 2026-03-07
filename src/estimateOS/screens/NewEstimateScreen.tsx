@@ -148,13 +148,16 @@ const ash = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export function NewEstimateScreen({ route, navigation }: any) {
   const estimateId: string | undefined = route?.params?.estimateId;
+  // IntakeScreen passes prefillCustomer when converting a lead to an estimate
+  const prefillCustomer: { id?: string; name?: string; phone?: string; email?: string; address?: string } | undefined =
+    route?.params?.prefillCustomer;
   const isEditing = !!estimateId;
 
   // BUG FIX: merged verticals (built-in + custom), loaded once on mount
   const [verticals, setVerticals] = useState<VerticalConfig[]>(ALL_VERTICALS);
 
-  const [customerName, setCustomerName]   = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName]   = useState(prefillCustomer?.name ?? '');
+  const [customerPhone, setCustomerPhone] = useState(prefillCustomer?.phone ?? '');
   const [verticalIdx, setVerticalIdx]     = useState(0);
   const [serviceIdx, setServiceIdx]       = useState(0);
   const [answers, setAnswers]             = useState<Record<string, AnswerValue>>({});
@@ -166,7 +169,7 @@ export function NewEstimateScreen({ route, navigation }: any) {
   // Store original id when editing so we upsert the same record
   const editingIdRef = useRef<string | undefined>(undefined);
   const [aiHistory, setAiHistory] = useState<AiScanRecord[]>([]);
-  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
+  const [customerId, setCustomerId] = useState<string | undefined>(prefillCustomer?.id);
   const [customFields, setCustomFields] = useState<CustomIntakeField[]>([]);
   const [customAnswers, setCustomAnswers] = useState<Record<string, AnswerValue>>({});
   const estimateNumberRef = useRef<string | undefined>(undefined);
@@ -272,7 +275,9 @@ export function NewEstimateScreen({ route, navigation }: any) {
       serviceId:   service!.id,
       customer: {
         name,
-        phone: customerPhone.trim() || undefined,
+        phone:    customerPhone.trim() || prefillCustomer?.phone || undefined,
+        email:    prefillCustomer?.email || undefined,
+        address:  prefillCustomer?.address || undefined,
       },
       status,
       intakeAnswers:   answers,

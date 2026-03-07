@@ -99,7 +99,7 @@ const tr = StyleSheet.create({
   csTxt: { color: T.amberHi, fontSize: 10, fontWeight: '700' },
 });
 
-export function SettingsScreen() {
+export function SettingsScreen({ navigation }: any) {
   const [settings, setSettings]           = useState<AppSettings | null>(null);
   const [saving, setSaving]               = useState(false);
   const [creditBalance, setCreditBalance] = useState(0);
@@ -218,6 +218,25 @@ export function SettingsScreen() {
           );
         })()}
 
+        {/* ── Workflow Tools ────────────────────────────────────────────── */}
+        <SectionHeader title="Workflow Tools" />
+        <View style={s.card}>
+          <TouchableOpacity style={s.navRow} onPress={() => navigation?.navigate('CommTemplates')}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.navLabel}>Communication Templates</Text>
+              <Text style={s.navSub}>Edit follow-up, invoice, and check-in message templates</Text>
+            </View>
+            <Text style={s.navArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.navRow, { borderTopWidth: 1, borderTopColor: T.border }]} onPress={() => navigation?.navigate('PricingRules')}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.navLabel}>Pricing Rules</Text>
+              <Text style={s.navSub}>Manage custom pricing rules and vertical overrides</Text>
+            </View>
+            <Text style={s.navArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ── Save ─────────────────────────────────────────────────────── */}
         <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnTxt}>Save Settings</Text>}
@@ -252,4 +271,8 @@ const s = StyleSheet.create({
   creditCount: { color: T.sub, fontSize: 12, marginTop: 2 },
   creditHint:  { color: T.red, fontSize: 11, marginTop: 4 },
   creditCta:   { color: T.accent, fontSize: 13, fontWeight: '700' },
+  navRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 0, gap: 8 },
+  navLabel:{ color: T.text, fontSize: 15, fontWeight: '600' },
+  navSub:  { color: T.sub, fontSize: 12, marginTop: 2 },
+  navArrow:{ color: T.sub, fontSize: 22, marginLeft: 4 },
 });

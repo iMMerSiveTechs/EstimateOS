@@ -8,6 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Invoice, InvoiceLineItem } from '../models/types';
 import { InvoiceRepository } from '../storage/invoices';
 import { getBusinessProfile } from '../storage/settings';
+import { TimelineRepository } from '../storage/workflow';
 import { makeId } from '../domain/id';
 import { T, radii } from '../theme';
 
@@ -85,6 +86,16 @@ export function InvoiceScreen({ route, navigation }: any) {
     const now = new Date().toISOString();
     try {
       await save({ status, sentAt: status === 'sent' ? now : invoice.sentAt, paidAt: status === 'paid' ? now : invoice.paidAt });
+      // Record timeline event when status changes meaningfully
+      if (invoice.customerId && (status === 'sent' || status === 'paid')) {
+        await TimelineRepository.appendEvent({
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          estimateId: invoice.estimateId,
+          type: status === 'paid' ? 'status_changed' : 'quote_sent',
+          note: status === 'sent' ? `Invoice ${invoice.invoiceNumber} sent` : `Invoice ${invoice.invoiceNumber} marked paid`,
+        });
+      }
     } finally { setSaving(false); }
   };
 

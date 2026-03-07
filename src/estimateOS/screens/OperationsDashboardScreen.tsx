@@ -77,7 +77,7 @@ export function OperationsDashboardScreen({ navigation }: any) {
     try {
       const [ests, invs, custs, rems, intakes] = await Promise.all([
         EstimateRepository.listEstimates(),
-        InvoiceRepository.listInvoices ? InvoiceRepository.listInvoices() : Promise.resolve([]),
+        InvoiceRepository.listInvoices(),
         CustomerRepository.listCustomers(),
         ReminderRepository.listPending(),
         IntakeDraftRepository.listByStatus('new'),
@@ -288,13 +288,33 @@ export function OperationsDashboardScreen({ navigation }: any) {
           </>
         )}
 
-        {needsAttention.length === 0 && !loading && (
-          <View style={s.allClearCard}>
-            <Text style={s.allClearIcon}>✓</Text>
-            <Text style={s.allClearTxt}>All caught up</Text>
-            <Text style={s.allClearSub}>No overdue follow-ups or pending actions.</Text>
-          </View>
-        )}
+        {needsAttention.length === 0 && !loading && (() => {
+          const isFirstRun = estimates.length === 0 && customers.length === 0 && invoices.length === 0;
+          if (isFirstRun) {
+            return (
+              <View style={s.firstRunCard}>
+                <Text style={s.firstRunTitle}>Welcome to EstimateOS</Text>
+                <Text style={s.firstRunSub}>
+                  Start by capturing a lead or creating your first estimate.
+                  This dashboard will fill in as you use the app.
+                </Text>
+                <TouchableOpacity style={s.firstRunBtn} onPress={() => navigation.navigate('Intake')}>
+                  <Text style={s.firstRunBtnTxt}>Capture First Lead →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.firstRunBtn, { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border }]} onPress={() => navigation.navigate('NewEstimate')}>
+                  <Text style={[s.firstRunBtnTxt, { color: T.text }]}>Or Start an Estimate →</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return (
+            <View style={s.allClearCard}>
+              <Text style={s.allClearIcon}>✓</Text>
+              <Text style={s.allClearTxt}>All caught up</Text>
+              <Text style={s.allClearSub}>No overdue follow-ups or pending actions.</Text>
+            </View>
+          );
+        })()}
 
       </ScrollView>
     </SafeAreaView>
@@ -327,4 +347,9 @@ const s = StyleSheet.create({
   allClearIcon: { color: T.green, fontSize: 36, fontWeight: '800', marginBottom: 8 },
   allClearTxt: { color: T.text, fontSize: 18, fontWeight: '700' },
   allClearSub: { color: T.sub, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  firstRunCard: { marginTop: 20, backgroundColor: T.surface, borderRadius: radii.xl, padding: 28, borderWidth: 1, borderColor: T.border, alignItems: 'center', gap: 12 },
+  firstRunTitle: { color: T.text, fontSize: 20, fontWeight: '800' },
+  firstRunSub: { color: T.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  firstRunBtn: { width: '100%', backgroundColor: T.accent, borderRadius: radii.lg, paddingVertical: 14, alignItems: 'center' },
+  firstRunBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

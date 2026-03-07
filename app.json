@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "EstimateOS",
+    "slug": "estimate-os",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F1A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.naturalorigins.estimateos",
+      "infoPlist": {
+        "NSCameraUsageDescription": "EstimateOS uses the camera to capture site photos for estimates.",
+        "NSPhotoLibraryUsageDescription": "EstimateOS accesses your photo library to attach site photos to estimates.",
+        "NSMicrophoneUsageDescription": "EstimateOS uses the microphone for video recording.",
+        "NSPhotoLibraryAddUsageDescription": "EstimateOS saves site photos to your photo library."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0F1A"
+      },
+      "package": "com.naturalorigins.estimateos",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-image-picker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
