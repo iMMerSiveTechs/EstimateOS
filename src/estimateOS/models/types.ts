@@ -251,6 +251,11 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
+  // Follow-up workflow (Phase 6+)
+  followUpStatus?: FollowUpStatus;
+  lastContactAt?: string;
+  nextActionAt?: string;
+  nextActionNote?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -281,6 +286,12 @@ export interface Estimate {
   disclaimerText?: string;
   photos: string[];               // local URIs or remote URLs
   aiScanIds?: string[];
+  // Follow-up workflow (Phase 6+)
+  followUpStatus?: FollowUpStatus;
+  quoteSentAt?: string;
+  lastContactAt?: string;
+  nextActionAt?: string;
+  nextActionNote?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -514,6 +525,148 @@ export interface AutoReloadSettings {
 export interface AiCreditSettings {
   autoReload: AutoReloadSettings;
   stripeCustomerId?: string;    // set after first purchase
+}
+
+// ─── Follow-up / workflow types (Phase 6+) ──────────────────────────────────
+
+export type FollowUpStatus =
+  | 'lead_new'
+  | 'quote_in_progress'
+  | 'quote_sent'
+  | 'follow_up_due'
+  | 'awaiting_customer'
+  | 'appointment_scheduled'
+  | 'won'
+  | 'lost';
+
+export const FOLLOW_UP_LABELS: Record<FollowUpStatus, string> = {
+  lead_new:              'New Lead',
+  quote_in_progress:     'In Progress',
+  quote_sent:            'Quote Sent',
+  follow_up_due:         'Follow-up Due',
+  awaiting_customer:     'Awaiting Customer',
+  appointment_scheduled: 'Appt. Scheduled',
+  won:                   'Won',
+  lost:                  'Lost',
+};
+
+export type LeadUrgency = 'asap' | 'this_week' | 'this_month' | 'flexible';
+
+export const LEAD_URGENCY_LABELS: Record<LeadUrgency, string> = {
+  asap:       'ASAP',
+  this_week:  'This Week',
+  this_month: 'This Month',
+  flexible:   'Flexible',
+};
+
+export type ReminderType =
+  | 'estimate_followup'
+  | 'callback'
+  | 'appointment'
+  | 'invoice_reminder'
+  | 'checkin';
+
+export const REMINDER_TYPE_LABELS: Record<ReminderType, string> = {
+  estimate_followup: 'Estimate Follow-up',
+  callback:          'Callback Needed',
+  appointment:       'Appointment Reminder',
+  invoice_reminder:  'Invoice Reminder',
+  checkin:           'Check-in',
+};
+
+export interface Reminder {
+  id: string;
+  customerId?: string;
+  customerName?: string;        // denormalized for display
+  estimateId?: string;
+  type: ReminderType;
+  dueDate: string;              // ISO date string
+  note: string;
+  completed: boolean;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CommTemplateType =
+  | 'estimate_followup'
+  | 'appointment_reminder'
+  | 'checkin'
+  | 'invoice_reminder'
+  | 'missed_call';
+
+export const COMM_TEMPLATE_TYPE_LABELS: Record<CommTemplateType, string> = {
+  estimate_followup:    'Estimate Follow-up',
+  appointment_reminder: 'Appointment Reminder',
+  checkin:              'Check-in',
+  invoice_reminder:     'Invoice Reminder',
+  missed_call:          'Missed Call Callback',
+};
+
+export interface CommTemplate {
+  id: string;
+  name: string;
+  type: CommTemplateType;
+  subject: string;
+  body: string;           // {customer_name} {business_name} {estimate_number} {price_range} {address}
+  isDefault: boolean;
+  updatedAt: string;
+}
+
+export type TimelineEventType =
+  | 'intake_created'
+  | 'estimate_created'
+  | 'quote_sent'
+  | 'followup_scheduled'
+  | 'reminder_completed'
+  | 'invoice_created'
+  | 'status_changed'
+  | 'note_added'
+  | 'won'
+  | 'lost';
+
+export const TIMELINE_EVENT_LABELS: Record<TimelineEventType, string> = {
+  intake_created:     'Lead created',
+  estimate_created:   'Estimate created',
+  quote_sent:         'Quote sent',
+  followup_scheduled: 'Follow-up scheduled',
+  reminder_completed: 'Reminder completed',
+  invoice_created:    'Invoice created',
+  status_changed:     'Status changed',
+  note_added:         'Note added',
+  won:                'Marked as Won',
+  lost:               'Marked as Lost',
+};
+
+export interface TimelineEvent {
+  id: string;
+  customerId: string;
+  estimateId?: string;
+  invoiceId?: string;
+  type: TimelineEventType;
+  note?: string;
+  createdAt: string;
+}
+
+export interface IntakeDraft {
+  id: string;
+  customerName: string;
+  phone: string;
+  email: string;
+  propertyAddress: string;
+  serviceType: string;
+  urgency: LeadUrgency;
+  notes: string;
+  referralSource?: string;
+  status: 'new' | 'converted' | 'archived';
+  followUpStatus: FollowUpStatus;
+  customerId?: string;          // set after converting to customer
+  estimateId?: string;          // set after converting to estimate
+  lastContactAt?: string;
+  nextActionAt?: string;
+  nextActionNote?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Sync status ────────────────────────────────────────────────────────────
