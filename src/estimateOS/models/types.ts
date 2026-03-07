@@ -287,7 +287,7 @@ export interface Estimate {
 
 // ─── Invoices ──────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = 'draft' | 'sent' | 'paid';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'void';
 
 export interface InvoiceLineItem {
   id: string;
@@ -309,9 +309,19 @@ export interface Invoice {
   };
   status: InvoiceStatus;
   lineItems: InvoiceLineItem[];
+  // Computed totals (snapshot at last save)
+  subtotal?: number;
+  discountAmount?: number;        // flat discount applied
   taxRate: number;                // 0.08 = 8%
+  taxAmount?: number;             // snapshot
+  totalAmount?: number;           // final total snapshot
+  // Payment
   paymentTerms: string;           // e.g. "Due on receipt", "Net 30"
+  // Snapshot of business terms at invoice creation
+  termsFooterSnapshot?: string;
   notes?: string;
+  voidedAt?: string;
+  voidReason?: string;
   sentAt?: string;
   paidAt?: string;
   createdAt: string;
@@ -325,6 +335,7 @@ export interface BusinessProfile {
   phone?: string;
   email?: string;
   address?: string;
+  website?: string;
   termsAndConditions?: string;
   logoUri?: string;
 }
@@ -358,11 +369,15 @@ export interface AiFeatureSettings {
 }
 
 export interface IntegrationSettings {
-  gemini: boolean;              // stub
-  googleMaps: boolean;          // stub
+  gemini: boolean;              // stub — requires API key in Firebase
+  googleMaps: boolean;          // stub — requires Maps API key
   voiceInput: boolean;          // stub
   imageCreation: boolean;       // stub
   cloudSync: boolean;           // Firebase — already connected
+  // Billing — requires Stripe setup
+  stripeEnabled: boolean;       // false until Stripe publishable key configured
+  stripePublishableKey?: string;
+  googleMapsApiKey?: string;
 }
 
 export interface EmailTemplate {
@@ -378,6 +393,7 @@ export interface AppSettings {
   aiFeatures: AiFeatureSettings;
   integrations: IntegrationSettings;
   emailTemplate: EmailTemplate;
+  aiCreditSettings?: AiCreditSettings;
 }
 
 // ─── Service templates (Phase 2 template editor) ──────────────────────────
@@ -391,7 +407,50 @@ export interface ServiceTemplate {
   updatedAt: string;
 }
 
-// ─── AI scan history ───────────────────────────────────────────────────────
+// ─── AI analysis (working/in-memory result, NOT persisted directly) ───────────
+// This is the rich result from an AI analysis session.
+// The persisted history record is AiScanRecord (below).
+
+export interface SuggestedAdjustment {
+  label: string;
+  questionId?: string;            // maps to an IntakeQuestion id
+  suggestedValue?: AnswerValue;
+  confidence: 'high' | 'medium' | 'low';
+  confidenceScore?: number;       // 0–1
+  note?: string;
+  evidence?: string;
+  mediaIndex?: number;
+  boundingBox?: [number, number, number, number];
+}
+
+export interface AiAnalysisRecord {
+  id: string;
+  imageCount: number;
+  focusPrompt?: string;
+  verticalId?: string;
+  summary: string;
+  suggestedAdjustments: SuggestedAdjustment[];
+  creditsUsed: number;
+  createdAt: string;              // ISO timestamp
+  // Failure info (populated when analysis errored)
+  failed?: boolean;
+  failureType?: AiFailureType;
+  errorMessage?: string;
+}
+
+export type AiFailureType =
+  | 'missing_api_key'
+  | 'provider_unavailable'
+  | 'no_credits'
+  | 'offline'
+  | 'timeout'
+  | 'unsupported_media'
+  | 'oversized_media'
+  | 'parse_failure'
+  | 'invalid_site_photo'
+  | 'unknown';
+
+// ─── AI scan history (persisted checkpoint per estimate) ──────────────────
 
 export interface EvidenceEntry {
   value: AnswerValue;
@@ -425,4 +484,60 @@ export interface AnalysisRecord {
   creditsUsed: number;
   status: 'success' | 'failed';
   errorMessage?: string;
+}
+
+// ─── AI credit packs (for purchase flow) ─────────────────────────────────
+
+export interface AiCreditPack {
+  id: string;
+  label: string;
+  credits: number;
+  price: number;                // USD cents
+  priceLabel: string;           // e.g. "$4.99"
+  popular?: boolean;
+}
+
+export const AI_CREDIT_PACKS: AiCreditPack[] = [
+  { id: 'pack_100', label: '100 Credits',  credits: 100,  price: 499,  priceLabel: '$4.99' },
+  { id: 'pack_500', label: '500 Credits',  credits: 500,  price: 1999, priceLabel: '$19.99', popular: true },
+  { id: 'pack_1200',label: '1200 Credits', credits: 1200, price: 3999, priceLabel: '$39.99' },
+];
+
+export const AI_CREDITS_LOW_THRESHOLD = 10;  // amber warning below this
+
+export interface AutoReloadSettings {
+  enabled: boolean;
+  packId: string;               // which pack to auto-purchase
+  threshold: number;            // reload when balance drops below this
+}
+
+export interface AiCreditSettings {
+  autoReload: AutoReloadSettings;
+  stripeCustomerId?: string;    // set after first purchase
+}
+
+// ─── Sync status ────────────────────────────────────────────────────────────
+// Used to show users whether data is saved locally, syncing, or failed.
+
+export type SyncState = 'saved_local' | 'syncing' | 'synced' | 'sync_failed';
+
+export interface SyncStatus {
+  state: SyncState;
+  lastSyncedAt?: string;        // ISO timestamp of last successful sync
+  errorMessage?: string;
+}
+
+// ─── Org / workspace (Phase 5+ multi-company groundwork) ──────────────────
+// Currently single-user; this stub prepares for future org model.
+// TODO: When multi-company is needed, expand this into a full Org entity.
+
+export type UserRole = 'owner' | 'admin' | 'estimator' | 'viewer';
+
+export interface OrgWorkspace {
+  // TODO: Populated when company/team features are enabled.
+  workspaceId?: string;         // unique per company; undefined = personal/solo mode
+  workspaceName?: string;
+  userRole?: UserRole;
+  // owner uid for future billing/permission scoping
+  ownerUid?: string;
 }

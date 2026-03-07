@@ -1,13 +1,15 @@
 // ─── SettingsScreen ────────────────────────────────────────────────────────
-// Business Profile, Export Settings, AI Features, Integrations
+// Business Profile, Export Settings, AI Features, Integrations, Credits
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   SafeAreaView, Switch, ActivityIndicator, Animated,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { AppSettings } from '../models/types';
+import { AppSettings, AI_CREDITS_LOW_THRESHOLD } from '../models/types';
 import { getSettings, saveSettings } from '../storage/settings';
+import { getCredits } from '../storage/aiCredits';
+import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
 import { T, radii } from '../theme';
 
 function useToast() {
@@ -98,13 +100,16 @@ const tr = StyleSheet.create({
 });
 
 export function SettingsScreen() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [settings, setSettings]           = useState<AppSettings | null>(null);
+  const [saving, setSaving]               = useState(false);
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [showCredits, setShowCredits]     = useState(false);
   const { show: showToast, Toast } = useToast();
 
   const load = useCallback(async () => {
-    const s = await getSettings();
+    const [s, bal] = await Promise.all([getSettings(), getCredits()]);
     setSettings(s);
+    setCreditBalance(bal.balance);
   }, []);
 
   useFocusEffect(load);
@@ -132,6 +137,7 @@ export function SettingsScreen() {
         <FieldRow label="Business Name" value={settings.businessProfile.businessName} onChange={v => patchProfile({ businessName: v })} placeholder="Natural Origins Roofing" />
         <FieldRow label="Phone" value={settings.businessProfile.phone ?? ''} onChange={v => patchProfile({ phone: v })} keyboard="phone-pad" placeholder="(555) 555-5555" />
         <FieldRow label="Email" value={settings.businessProfile.email ?? ''} onChange={v => patchProfile({ email: v })} keyboard="email-address" placeholder="hello@yourcompany.com" />
+        <FieldRow label="Website" value={settings.businessProfile.website ?? ''} onChange={v => patchProfile({ website: v })} keyboard="url" placeholder="https://yourcompany.com" />
         <FieldRow label="Address" value={settings.businessProfile.address ?? ''} onChange={v => patchProfile({ address: v })} multiline placeholder="123 Main St, City, State ZIP" />
         <FieldRow label="Terms & Conditions" value={settings.businessProfile.termsAndConditions ?? ''} onChange={v => patchProfile({ termsAndConditions: v })} multiline placeholder="All work is guaranteed for 1 year. Payment due within 30 days…" />
 
@@ -181,7 +187,36 @@ export function SettingsScreen() {
             value={settings.integrations.cloudSync}
             onChange={v => patchInt({ cloudSync: v })}
           />
+          <ToggleRow
+            label="Stripe Billing"
+            subLabel="Enable credit purchases — requires Stripe publishable key"
+            value={settings.integrations.stripeEnabled ?? false}
+            onChange={v => patchInt({ stripeEnabled: v })}
+            comingSoon
+          />
         </View>
+
+        {/* ── AI Credits ────────────────────────────────────────────────── */}
+        <SectionHeader title="AI Credits" />
+        {(() => {
+          const color = creditBalance <= 0 ? T.red : creditBalance <= AI_CREDITS_LOW_THRESHOLD ? T.amber : T.green;
+          const label = creditBalance <= 0 ? 'No Credits' : creditBalance <= AI_CREDITS_LOW_THRESHOLD ? 'Credits Low' : 'Credits OK';
+          return (
+            <View style={s.card}>
+              <TouchableOpacity style={s.creditRow} onPress={() => setShowCredits(true)}>
+                <View style={[s.creditDot, { backgroundColor: color }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.creditLabel}>{label}</Text>
+                  <Text style={s.creditCount}>{creditBalance} credits remaining</Text>
+                  {creditBalance <= 0 && (
+                    <Text style={s.creditHint}>AI features are disabled. Buy credits to continue.</Text>
+                  )}
+                </View>
+                <Text style={s.creditCta}>Buy Credits →</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
 
         {/* ── Save ─────────────────────────────────────────────────────── */}
         <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
@@ -190,6 +225,13 @@ export function SettingsScreen() {
 
       </ScrollView>
       <Toast />
+
+      <CreditPurchaseModal
+        visible={showCredits}
+        onClose={() => setShowCredits(false)}
+        stripeEnabled={settings?.integrations.stripeEnabled ?? false}
+        onPurchased={newBal => setCreditBalance(newBal)}
+      />
     </SafeAreaView>
   );
 }
@@ -204,4 +246,10 @@ const s = StyleSheet.create({
   hint: { color: T.muted, fontSize: 12, marginTop: -4, marginBottom: 8 },
   saveBtn: { backgroundColor: T.accent, borderRadius: radii.lg, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
   saveBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  creditRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 10 },
+  creditDot:   { width: 10, height: 10, borderRadius: 5 },
+  creditLabel: { color: T.text, fontSize: 14, fontWeight: '700' },
+  creditCount: { color: T.sub, fontSize: 12, marginTop: 2 },
+  creditHint:  { color: T.red, fontSize: 11, marginTop: 4 },
+  creditCta:   { color: T.accent, fontSize: 13, fontWeight: '700' },
 });

@@ -295,14 +295,18 @@ export function computePricingV2(
   }
 
   // ── Manual line items → drivers ───────────────────────────────────────────────
+  // Manual items intentionally allow negative values (discounts / credits).
+  // We do NOT clamp to 0 here — the operator is explicitly overriding the total.
   for (const item of manualItems) {
     const id = `manual_${item.id}`;
     const ov = overrides?.[id];
+    const itemMin = isFinite(item.min) ? item.min : 0;
+    const itemMax = isFinite(item.max) ? item.max : 0;
     drivers.push({
       id,
       label: item.label,
-      minImpact: clamp(item.min),
-      maxImpact: clamp(item.max),
+      minImpact: itemMin,
+      maxImpact: itemMax,
       bucket: (item as any).bucket ?? 'other',
       triggeredBy: 'Manual entry',
       explanation: item.note ?? 'Manually added line item.',
@@ -311,8 +315,8 @@ export function computePricingV2(
       overrideMax: ov?.max,
       disabled:    ov?.disabled,
     });
-    runMin += clamp(item.min);
-    runMax += clamp(item.max);
+    runMin += itemMin;
+    runMax += itemMax;
   }
 
   // ── Apply effective overrides to running totals ───────────────────────────────
@@ -326,9 +330,13 @@ export function computePricingV2(
   }
 
   // ── Apply variance band ───────────────────────────────────────────────────────
+  // Do NOT clamp to 0 here: operator manual discounts can legitimately produce
+  // negative totals (e.g. full credit on a job). Clamp only for NaN/Infinity.
   const v = config.variancePct;
-  const finalMin = clamp(effMin * (1 - v / 2));
-  const finalMax = clamp(effMax * (1 + v / 2));
+  const safeEffMin = isFinite(effMin) ? effMin : 0;
+  const safeEffMax = isFinite(effMax) ? effMax : 0;
+  const finalMin = safeEffMin * (1 - v / 2);
+  const finalMax = safeEffMax * (1 + v / 2);
 
   const result: PricingResultV2 = {
     range: {
