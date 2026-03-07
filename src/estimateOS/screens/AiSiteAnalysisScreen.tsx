@@ -321,12 +321,13 @@ const hi = StyleSheet.create({
 });
 
 // ─── Result Modal ─────────────────────────────────────────────────────────────
-function ResultModal({ record, jobs, visible, onClose, onApply }: {
+function ResultModal({ record, jobs, visible, onClose, onApply, onCheckpoint }: {
   record: AiAnalysisRecord | null;
   jobs: MediaJob[];
   visible: boolean;
   onClose: () => void;
   onApply?: (record: AiAnalysisRecord) => void;
+  onCheckpoint?: (record: AiAnalysisRecord) => void;
 }) {
   if (!record) return null;
   return (
@@ -355,15 +356,38 @@ function ResultModal({ record, jobs, visible, onClose, onApply }: {
             <Text style={rm.summaryTxt}>{record.summary}</Text>
           </View>
 
+          {/* Quick Review Summary */}
+          {record.suggestedAdjustments.length > 0 && (
+            <View style={rm.quickReview}>
+              <Text style={rm.quickReviewTitle}>📋 Quick Review</Text>
+              {record.suggestedAdjustments.map((adj, i) => {
+                const icon = adj.confidence === 'high' ? '✅' : adj.confidence === 'medium' ? '🟡' : '⚠️';
+                return (
+                  <View key={i} style={rm.quickBullet}>
+                    <Text style={rm.quickBulletIcon}>{icon}</Text>
+                    <Text style={rm.quickBulletTxt} numberOfLines={2}>{adj.label}</Text>
+                    {(adj.confidenceScore ?? 1) < 0.5 && (
+                      <View style={rm.needsReview}><Text style={rm.needsReviewTxt}>Review</Text></View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           <Text style={rm.sectionLabel}>INSIGHTS ({record.suggestedAdjustments.length})</Text>
           {record.suggestedAdjustments.map((adj, i) => {
             const refJob = adj.mediaIndex != null ? jobs[adj.mediaIndex] : undefined;
             const refUri = refJob?.outputUri ?? refJob?.uri;
+            const needsReview = (adj.confidenceScore ?? 1) < 0.5;
             return (
               <View key={i} style={rm.adjCard}>
                 <View style={rm.adjHeader}>
                   <Text style={rm.adjLabel}>{adj.label}</Text>
-                  <ConfBadge level={adj.confidence} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {needsReview && <View style={rm.needsReview}><Text style={rm.needsReviewTxt}>Needs Review</Text></View>}
+                    <ConfBadge level={adj.confidence} />
+                  </View>
                 </View>
                 <ConfBar score={adj.confidenceScore} level={adj.confidence} />
                 {(adj.evidence || adj.note) && (
@@ -394,8 +418,14 @@ function ResultModal({ record, jobs, visible, onClose, onApply }: {
             </Text>
           </View>
 
+          {onCheckpoint && (
+            <TouchableOpacity style={rm.checkpointBtn} onPress={() => { onCheckpoint(record); onClose(); }}>
+              <Text style={rm.checkpointBtnTxt}>💾 Save Checkpoint</Text>
+              <Text style={rm.checkpointBtnSub}>Apply answers without leaving this screen</Text>
+            </TouchableOpacity>
+          )}
           {onApply && (
-            <TouchableOpacity style={rm.applyBtn} onPress={() => { onApply(record); onClose(); }}>
+            <TouchableOpacity style={[rm.applyBtn, onCheckpoint && { marginTop: 10 }]} onPress={() => { onApply(record); onClose(); }}>
               <Text style={rm.applyBtnTxt}>Apply to Estimate →</Text>
               <Text style={rm.applyBtnSub}>
                 {record.suggestedAdjustments.filter(a => a.questionId).length} answers will be pre-filled
@@ -435,6 +465,16 @@ const rm = StyleSheet.create({
   adjApplyVal:  { fontWeight: '700' },
   disclaimerBox:{ backgroundColor: D.muted, borderRadius: 10, padding: 12, marginTop: 8, marginBottom: 20 },
   disclaimerTxt:{ color: D.sub, fontSize: 12, lineHeight: 17 },
+  quickReview:      { backgroundColor: D.surface, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: D.border, gap: 8 },
+  quickReviewTitle: { color: D.textDim, fontSize: 12, fontWeight: '700', marginBottom: 4 },
+  quickBullet:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  quickBulletIcon:  { fontSize: 13, width: 18 },
+  quickBulletTxt:   { color: D.sub, fontSize: 12, flex: 1, lineHeight: 17 },
+  needsReview:      { backgroundColor: D.amberLo, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: D.amber },
+  needsReviewTxt:   { color: D.amberHi, fontSize: 9, fontWeight: '700' },
+  checkpointBtn:    { backgroundColor: D.surface, borderWidth: 1, borderColor: D.border, borderRadius: 14, padding: 14, alignItems: 'center', gap: 4 },
+  checkpointBtnTxt: { color: D.textDim, fontWeight: '700', fontSize: 15 },
+  checkpointBtnSub: { color: D.sub, fontSize: 12 },
   applyBtn:     { backgroundColor: D.teal, borderRadius: 14, padding: 16, alignItems: 'center', gap: 4 },
   applyBtnTxt:  { color: '#fff', fontWeight: '700', fontSize: 16 },
   applyBtnSub:  { color: 'rgba(255,255,255,0.65)', fontSize: 12 },
@@ -589,6 +629,23 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
     }]);
   };
 
+  // Save AI answers to estimate without navigating away (Checkpoint)
+  const checkpointEstimate = async (record: AiAnalysisRecord) => {
+    if (!estimateId) return;
+    const estimate = await EstimateRepository.getEstimate(estimateId);
+    if (!estimate) { Alert.alert('Estimate not found'); return; }
+    const merged = { ...estimate.intakeAnswers };
+    for (const adj of record.suggestedAdjustments) {
+      if (adj.questionId && adj.suggestedValue !== undefined) {
+        merged[adj.questionId] = adj.suggestedValue;
+        merged[`${adj.questionId}__ai_confidence`] = adj.confidence;
+        merged[`${adj.questionId}__ai_source`] = 'ai_scan';
+      }
+    }
+    await EstimateRepository.upsertEstimate({ ...estimate, intakeAnswers: merged, updatedAt: new Date().toISOString() });
+    Alert.alert('Checkpoint Saved', 'AI answers applied. Continue working or go back to the estimate.');
+  };
+
   const canAnalyze = jobs.some(j => j.status === 'ready') && !analyzing;
 
   return (
@@ -727,6 +784,7 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
         visible={showResult || !!historyRecord}
         onClose={() => { setShowResult(false); setHistoryRecord(null); }}
         onApply={estimateId ? applyToEstimate : undefined}
+        onCheckpoint={estimateId ? checkpointEstimate : undefined}
       />
 
       {/* History list modal */}

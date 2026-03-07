@@ -26,7 +26,7 @@ function recordsCol(estimateId: string) {
 }
 
 export async function getAiHistory(estimateId: string): Promise<AiScanRecord[]> {
-  const q = query(recordsCol(estimateId), orderBy('scannedAt', 'desc'));
+  const q = query(recordsCol(estimateId), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AiScanRecord));
 }
@@ -35,6 +35,6 @@ export async function appendAiHistory(record: AiScanRecord): Promise<void> {
   const { id: _id, ...data } = record;
   await addDoc(recordsCol(record.estimateId), {
     ...data,
-    scannedAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
   });
 }
