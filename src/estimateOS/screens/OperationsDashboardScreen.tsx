@@ -169,7 +169,7 @@ export function OperationsDashboardScreen({ navigation }: any) {
             <Text style={s.quickIcon}>📝</Text>
             <Text style={s.quickTxt}>New Estimate</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.quickBtn} onPress={() => navigation.navigate('CustomerList')}>
+          <TouchableOpacity style={s.quickBtn} onPress={() => navigation.navigate('CustomersTab')}>
             <Text style={s.quickIcon}>👥</Text>
             <Text style={s.quickTxt}>Customers</Text>
           </TouchableOpacity>
