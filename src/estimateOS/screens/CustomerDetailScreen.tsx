@@ -5,10 +5,14 @@ import {
   SafeAreaView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Customer, Estimate, Invoice } from '../models/types';
+import { Customer, Estimate, Invoice, FollowUpStatus } from '../models/types';
 import { CustomerRepository } from '../storage/customers';
 import { EstimateRepository } from '../storage/repository';
 import { InvoiceRepository } from '../storage/invoices';
+import { TimelineRepository } from '../storage/workflow';
+import { FollowUpPanel } from '../components/FollowUpPanel';
+import { ReminderSheet } from '../components/ReminderSheet';
+import { CommReviewModal } from '../components/CommReviewModal';
 import { T, radii } from '../theme';
 
 function SectionHeader({ title }: { title: string }) {
@@ -24,6 +28,8 @@ export function CustomerDetailScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
+  const [showComm, setShowComm] = useState(false);
 
   // Edit form state
   const [name, setName] = useState('');
@@ -149,6 +155,43 @@ export function CustomerDetailScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {/* Follow-up panel */}
+        <Text style={sh.txt}>Follow-up</Text>
+        <FollowUpPanel
+          status={customer.followUpStatus}
+          lastContactAt={customer.lastContactAt}
+          nextActionAt={customer.nextActionAt}
+          nextActionNote={customer.nextActionNote}
+          onStatusChange={async (status: FollowUpStatus) => {
+            const updated = { ...customer, followUpStatus: status, updatedAt: new Date().toISOString() };
+            setCustomer(updated);
+            await CustomerRepository.upsertCustomer(updated);
+            await TimelineRepository.appendEvent({ customerId: customer.id, type: 'status_changed', note: `Status → ${status}` });
+          }}
+          onNextActionChange={async (date, note) => {
+            const updated = { ...customer, nextActionAt: date, nextActionNote: note, updatedAt: new Date().toISOString() };
+            setCustomer(updated);
+            await CustomerRepository.upsertCustomer(updated);
+          }}
+          onMarkContacted={async () => {
+            const now = new Date().toISOString();
+            const updated = { ...customer, lastContactAt: now, updatedAt: now };
+            setCustomer(updated);
+            await CustomerRepository.upsertCustomer(updated);
+            await TimelineRepository.appendEvent({ customerId: customer.id, type: 'note_added', note: 'Marked as contacted' });
+          }}
+        />
+
+        {/* Quick comms */}
+        <View style={s.commRow}>
+          <TouchableOpacity style={s.commBtn} onPress={() => setShowReminder(true)}>
+            <Text style={s.commBtnTxt}>⏰ Reminder</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.commBtn} onPress={() => setShowComm(true)}>
+            <Text style={s.commBtnTxt}>✉️ Message</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Timeline */}
         <SectionHeader title={`History (${timeline.length})`} />
         {timeline.length === 0 ? (
@@ -188,6 +231,20 @@ export function CustomerDetailScreen({ route, navigation }: any) {
           })
         )}
       </ScrollView>
+
+      <ReminderSheet
+        visible={showReminder}
+        initial={{ customerId: customer.id, customerName: customer.name, type: 'callback' }}
+        onClose={() => setShowReminder(false)}
+        onSaved={() => setShowReminder(false)}
+      />
+
+      <CommReviewModal
+        visible={showComm}
+        vars={{ customer_name: customer.name, address: customer.address }}
+        onClose={() => setShowComm(false)}
+        onSent={() => setShowComm(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -216,6 +273,9 @@ const s = StyleSheet.create({
   timelineSub: { color: T.sub, fontSize: 12, marginTop: 2 },
   timelineDate: { color: T.muted, fontSize: 11, marginTop: 2 },
   arrow: { color: T.sub, fontSize: 20 },
+  commRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  commBtn: { flex: 1, backgroundColor: T.surface, borderRadius: radii.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: T.border },
+  commBtnTxt: { color: T.text, fontSize: 13, fontWeight: '600' },
   // Edit form
   editHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   editTitle: { color: T.text, fontSize: 17, fontWeight: '700' },
