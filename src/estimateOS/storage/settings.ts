@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     phone: '',
     email: '',
     address: '',
+    website: '',
     termsAndConditions: '',
   },
   exportSettings: {
@@ -50,6 +51,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     voiceInput: false,
     imageCreation: false,
     cloudSync: true,    // Firebase is already connected
+    stripeEnabled: false, // requires Stripe publishable key setup
   },
   emailTemplate: {
     subject: 'Estimate for {customer_name} – {address} – {estimate_number}',

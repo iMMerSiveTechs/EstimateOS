@@ -15,6 +15,7 @@ const INV_STATUS: Record<string, { bg: string; border: string; text: string; lab
   draft: { bg: T.surface,  border: T.border, text: T.sub,     label: 'Draft' },
   sent:  { bg: T.amberLo,  border: T.amber,  text: T.amberHi, label: 'Sent' },
   paid:  { bg: T.greenLo,  border: T.green,  text: T.greenHi, label: 'Paid' },
+  void:  { bg: T.redLo,    border: T.red,    text: T.red,     label: 'Void' },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -63,7 +64,8 @@ export function InvoiceScreen({ route, navigation }: any) {
   if (loading) return <SafeAreaView style={s.safe}><ActivityIndicator style={{ marginTop: 60 }} color={T.accent} /></SafeAreaView>;
   if (!invoice) return <SafeAreaView style={s.safe}><Text style={s.notFound}>Invoice not found.</Text></SafeAreaView>;
 
-  const canEdit = invoice.status === 'draft';
+  const canEdit  = invoice.status === 'draft';
+  const isVoided = invoice.status === 'void';
 
   const subtotal = invoice.lineItems.reduce((sum, li) => sum + li.unitCost * li.quantity, 0);
   const taxRate = Math.min(1, Math.max(0, Number(taxInput) / 100 || 0));
@@ -138,6 +140,7 @@ export function InvoiceScreen({ route, navigation }: any) {
           <Text style={s.invDate}>Issued: {new Date(invoice.createdAt).toLocaleDateString()}</Text>
           {invoice.sentAt && <Text style={s.invDate}>Sent: {new Date(invoice.sentAt).toLocaleDateString()}</Text>}
           {invoice.paidAt && <Text style={s.invDate}>Paid: {new Date(invoice.paidAt).toLocaleDateString()}</Text>}
+          {invoice.voidedAt && <Text style={[s.invDate, { color: T.red }]}>Voided: {new Date(invoice.voidedAt).toLocaleDateString()}{invoice.voidReason ? ` — ${invoice.voidReason}` : ''}</Text>}
         </View>
 
         {/* Line Items */}
@@ -211,6 +214,21 @@ export function InvoiceScreen({ route, navigation }: any) {
         {invoice.status === 'sent' && (
           <TouchableOpacity style={[s.actionBtn, s.actionBtnGreen, { marginTop: 10 }]} onPress={() => markStatus('paid')} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={[s.actionBtnTxt, { color: '#fff' }]}>Mark as Paid ✓</Text>}
+          </TouchableOpacity>
+        )}
+        {(invoice.status === 'draft' || invoice.status === 'sent') && (
+          <TouchableOpacity style={[s.deleteBtn, { marginTop: 10 }]} onPress={() => Alert.alert(
+            'Void Invoice',
+            'Voiding marks this invoice as cancelled. It will not be deleted.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Void', style: 'destructive', onPress: async () => {
+                const now = new Date().toISOString();
+                await save({ status: 'void', voidedAt: now });
+              }},
+            ]
+          )} disabled={saving}>
+            <Text style={s.deleteBtnTxt}>Void Invoice</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={[s.deleteBtn, { marginTop: 10 }]} onPress={() => Alert.alert('Delete Invoice', 'Delete this invoice?', [

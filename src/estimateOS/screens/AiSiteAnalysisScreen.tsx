@@ -14,11 +14,12 @@ import {
   KeyboardAvoidingView, Platform, Dimensions, Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { getCredits, getAnalysisHistory, getCreditSettings } from '../storage/aiCredits';
+import { appendAiHistory } from '../storage/aiHistory';
 import {
-  getCredits, getAnalysisHistory,
   CreditBalance, AiAnalysisRecord, SuggestedAdjustment,
-} from '../storage/aiCredits';
-import { appendAiHistory, AiScanRecord, EvidenceEntry } from '../storage/aiHistory';
+  AiScanRecord, EvidenceEntry, AiCreditSettings,
+} from '../models/types';
 import { EstimateRepository } from '../storage/repository';
 import { makeId } from '../domain/id';
 import { ALL_VERTICALS } from '../config/verticals';
@@ -27,6 +28,11 @@ import { VerticalConfig } from '../models/types';
 import { T as TH, AI_D, radii } from '../theme';
 import { MediaGrid } from '../media/MediaGrid';
 import { MediaJob, getJobs, clearJobs } from '../media/MediaJobQueue';
+import {
+  checkAiAccess, classifyAiError, AI_FAILURE_MESSAGES,
+  shouldUseMapGrounding, MAPS_GROUNDING_HINT,
+} from '../domain/aiGuard';
+import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -541,6 +547,7 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
   const { estimateId, verticalId } = route?.params ?? {};
 
   const [credits, setCredits]           = useState<CreditBalance | null>(null);
+  const [creditSettings, setCreditSettings] = useState<AiCreditSettings | null>(null);
   const [jobs, setJobs]                 = useState<MediaJob[]>([]);
   const [focusPrompt, setFocusPrompt]   = useState('');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
@@ -552,18 +559,25 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
   const [historyRecord, setHistoryRecord] = useState<AiAnalysisRecord | null>(null);
   const [showHistory, setShowHistory]   = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [annotatingJobId, setAnnotatingJobId] = useState<string | null>(null);
   const [showAnnotate, setShowAnnotate] = useState(false);
   const [jobNotes, setJobNotes]         = useState<Record<string, string>>({});
   const [allVerticals, setAllVerticals] = useState<VerticalConfig[]>(ALL_VERTICALS);
+  const [failureMessage, setFailureMessage] = useState<string | null>(null);
+  const [mapsGrounding, setMapsGrounding] = useState(false);
+  // Retain last used jobs for retry (do not clear on analysis)
+  const lastJobsRef = useRef<MediaJob[]>([]);
 
   const loadData = useCallback(async () => {
-    const [bal, hist, custom] = await Promise.all([
+    const [bal, cs, hist, custom] = await Promise.all([
       getCredits(),
+      getCreditSettings(),
       getAnalysisHistory(),
       loadCustomVerticals(),
     ]);
     setCredits(bal);
+    setCreditSettings(cs);
     setHistory(hist);
     setAllVerticals(mergeVerticals(ALL_VERTICALS, custom));
   }, []);
@@ -578,14 +592,52 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
     setFocusPrompt(isSelected ? '' : preset.prompt);
   };
 
+  // Detect Maps grounding whenever focus prompt changes
+  const handleFocusPromptChange = (t: string) => {
+    setFocusPrompt(t);
+    setSelectedPreset(null);
+    setMapsGrounding(shouldUseMapGrounding(t));
+  };
+
   // Phase 0: show DemoModal, no credit deduction, no history write
-  const runAnalysis = () => {
-    const currentJobs = getJobs();
+  // Guard checks run even in demo mode so the UI is consistent for Phase 2+.
+  const runAnalysis = (useLastJobs = false) => {
+    const currentJobs = useLastJobs ? lastJobsRef.current : getJobs();
     if (currentJobs.length === 0) {
       Alert.alert('No media', 'Add at least one photo or video to analyze.');
       return;
     }
+
+    // Run AI access guard (Phase 0: requireCredits=false since no billing yet)
+    const guardResult = checkAiAccess({
+      credits,
+      creditSettings,
+      requireCredits: false,  // flip to true in Phase 2
+    });
+
+    if (guardResult.status === 'blocked') {
+      const msg = guardResult.message ?? AI_FAILURE_MESSAGES.unknown;
+      setFailureMessage(msg);
+      if (guardResult.showBuyCredits) {
+        setShowBuyCredits(true);
+      } else {
+        Alert.alert('Cannot Run Analysis', msg);
+      }
+      return;
+    }
+
+    setFailureMessage(null);
+    lastJobsRef.current = currentJobs;
     setShowDemoModal(true);
+  };
+
+  const retryAnalysis = () => {
+    if (lastJobsRef.current.length === 0) {
+      Alert.alert('No media to retry', 'Add photos or video and try again.');
+      return;
+    }
+    setFailureMessage(null);
+    runAnalysis(true);
   };
 
   // Apply AI result to estimate (preserved from prior phases)
@@ -699,12 +751,17 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
           <TextInput
             style={s.focusInput}
             value={focusPrompt}
-            onChangeText={(t) => { setFocusPrompt(t); setSelectedPreset(null); }}
+            onChangeText={handleFocusPromptChange}
             placeholder="Or type a custom focus directive…"
             placeholderTextColor={D.sub}
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {mapsGrounding && (
+            <View style={s.mapsHint}>
+              <Text style={s.mapsHintTxt}>{MAPS_GROUNDING_HINT} — location context will be used when AI backend is live</Text>
+            </View>
+          )}
 
           {/* Tips */}
           <View style={s.tipsRow}>
@@ -739,10 +796,25 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
             </TouchableOpacity>
           )}
 
+          {/* Failure banner */}
+          {failureMessage && (
+            <View style={s.failureBanner}>
+              <Text style={s.failureIcon}>⚠️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.failureTxt}>{failureMessage}</Text>
+                {lastJobsRef.current.length > 0 && (
+                  <TouchableOpacity style={s.retryBtn} onPress={retryAnalysis}>
+                    <Text style={s.retryBtnTxt}>↺ Retry with last media</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Analyze CTA */}
           <TouchableOpacity
             style={[s.analyzeBtn, !canAnalyze && s.analyzeBtnDisabled]}
-            onPress={runAnalysis}
+            onPress={() => runAnalysis(false)}
             disabled={!canAnalyze}
           >
             {analyzing ? (
@@ -825,6 +897,17 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
 
       {/* Phase 0: Demo modal */}
       <DemoModal visible={showDemoModal} onClose={() => setShowDemoModal(false)} />
+
+      {/* Buy Credits modal */}
+      <CreditPurchaseModal
+        visible={showBuyCredits}
+        onClose={() => setShowBuyCredits(false)}
+        stripeEnabled={false}
+        onPurchased={newBal => {
+          setCredits(prev => prev ? { ...prev, balance: newBal } : { balance: newBal, updatedAt: new Date().toISOString() });
+          setShowBuyCredits(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -887,4 +970,13 @@ const s = StyleSheet.create({
   emptyHist:    { alignItems: 'center', paddingVertical: 40, gap: 8 },
   emptyHistIcon:{ fontSize: 40 },
   emptyHistTxt: { color: D.sub, fontSize: 15 },
+
+  mapsHint:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: D.tealLo, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 6, borderWidth: 1, borderColor: D.teal },
+  mapsHintTxt: { color: D.tealHi, fontSize: 12, flex: 1, lineHeight: 16 },
+
+  failureBanner: { flexDirection: 'row', gap: 10, backgroundColor: D.redLo, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: D.red, alignItems: 'flex-start' },
+  failureIcon:   { fontSize: 16 },
+  failureTxt:    { color: '#fff', fontSize: 13, lineHeight: 18, marginBottom: 6 },
+  retryBtn:      { alignSelf: 'flex-start', backgroundColor: D.surface, borderRadius: radii.sm, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: D.border },
+  retryBtnTxt:   { color: D.teal, fontSize: 12, fontWeight: '700' },
 });

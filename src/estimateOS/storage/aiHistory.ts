@@ -5,12 +5,12 @@
 
 import {
   collection,
-  doc,
   addDoc,
   getDocs,
   query,
   orderBy,
   serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { AiScanRecord } from '../models/types';
@@ -25,10 +25,23 @@ function recordsCol(estimateId: string) {
   return collection(db, 'users', uid(), 'aiHistory', estimateId, 'records');
 }
 
+function deserialize(id: string, data: Record<string, any>): AiScanRecord {
+  const ts = (v: any): string =>
+    v instanceof Timestamp ? v.toDate().toISOString() : (v ?? new Date().toISOString());
+  return {
+    id,
+    estimateId:       data.estimateId ?? '',
+    createdAt:        ts(data.createdAt),
+    summary:          data.summary ?? '',
+    answersSnapshot:  data.answersSnapshot ?? {},
+    evidenceByQuestion: data.evidenceByQuestion ?? {},
+  };
+}
+
 export async function getAiHistory(estimateId: string): Promise<AiScanRecord[]> {
   const q = query(recordsCol(estimateId), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AiScanRecord));
+  return snap.docs.map((d) => deserialize(d.id, d.data() as Record<string, any>));
 }
 
 export async function appendAiHistory(record: AiScanRecord): Promise<void> {

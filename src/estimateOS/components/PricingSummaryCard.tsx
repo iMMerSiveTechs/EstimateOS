@@ -73,14 +73,20 @@ function ManualLineModal({ visible, onSave, onClose }: ManualLineModalProps) {
 
   const buckets: DriverBucket[] = ['labor', 'materials', 'access', 'disposal_fees', 'risk', 'other'];
 
-  const canSave = label.trim().length > 0 && parseFloat(low) >= 0 && parseFloat(high) >= parseFloat(low);
+  // Allow negative values for discounts/credits; low must be <= high, both must be finite numbers
+  const parsedLow  = parseFloat(low);
+  const parsedHigh = parseFloat(high);
+  const canSave = label.trim().length > 0
+    && !isNaN(parsedLow) && isFinite(parsedLow)
+    && !isNaN(parsedHigh) && isFinite(parsedHigh)
+    && parsedLow <= parsedHigh;
 
   const handleSave = () => {
     onSave({
       id:          `manual_${_manualIdx++}`,
       label:       label.trim(),
-      minImpact:   parseFloat(low) || 0,
-      maxImpact:   parseFloat(high) || 0,
+      minImpact:   parsedLow,
+      maxImpact:   parsedHigh,
       bucket,
       editable:    true,
       explanation: 'Manually added by operator',
@@ -198,9 +204,10 @@ export function PricingSummaryCard({ result, overrides, onOverrideChange }: Prop
   effMin += result.range.min - (result.drivers.reduce((s, d) => s + d.minImpact, 0));
   effMax += result.range.max - (result.drivers.reduce((s, d) => s + d.maxImpact, 0));
 
-  // Use computed range when no overrides, effective when overrides exist
-  const displayMin = hasOverrides ? Math.max(0, Math.round(effMin / 5) * 5) : result.range.min;
-  const displayMax = hasOverrides ? Math.max(0, Math.round(effMax / 5) * 5) : result.range.max;
+  // Use computed range when no overrides, effective when overrides/manual items exist
+  // Do NOT clamp to 0: manual discount items can legitimately make the total smaller
+  const displayMin = hasOverrides ? Math.round(effMin / 5) * 5 : result.range.min;
+  const displayMax = hasOverrides ? Math.round(effMax / 5) * 5 : result.range.max;
 
   function handleOverrideSave(o: DriverOverride) {
     onOverrideChange({ ...overrides, [o.driverId]: o });
@@ -249,7 +256,7 @@ export function PricingSummaryCard({ result, overrides, onOverrideChange }: Prop
               <Text style={s.bucketIcon}>✏️</Text>
               <Text style={s.bucketName}>Manual</Text>
               <Text style={s.bucketRange}>
-                {fmt(manualDrivers.reduce((s, d) => s + d.minImpact, 0))} – {fmt(manualDrivers.reduce((s, d) => s + d.maxImpact, 0))}
+                {fmt(manualDrivers.reduce((acc, d) => acc + d.minImpact, 0))} – {fmt(manualDrivers.reduce((acc, d) => acc + d.maxImpact, 0))}
               </Text>
             </View>
           )}
