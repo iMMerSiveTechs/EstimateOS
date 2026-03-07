@@ -5,7 +5,7 @@ import {
   Modal, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { ALL_VERTICALS } from '../config/verticals';
-import { VerticalConfig, Estimate, IntakeQuestion, AnswerValue, AI_META_PREFIX, DriverOverrideMap, LineItem } from '../models/types';
+import { VerticalConfig, Estimate, IntakeQuestion, AnswerValue, AI_META_PREFIX, DriverOverrideMap, LineItem, CustomIntakeField } from '../models/types';
 import { EstimateRepository } from '../storage/repository';
 import { IntakeFormRenderer } from '../components/IntakeFormRenderer';
 import { computePricingV2, PricingResultV2 } from '../domain/pricingEngineV2';
@@ -16,6 +16,9 @@ import { loadCustomVerticals, mergeVerticals } from '../storage/customVerticals'
 import { T, radii, spacing, GlassPanel, GlowButton, Chip, FieldLabel, SectionHeader } from '../theme';
 import { getAiHistory, AiScanRecord } from '../storage/aiHistory';
 import { useFocusEffect } from '@react-navigation/native';
+import { CustomerPicker } from '../components/CustomerPicker';
+import { getTemplate } from '../storage/templates';
+import { nextEstimateNumber } from '../storage/settings';
 
 // ─── Inline toast ─────────────────────────────────────────────────────────────
 function useToast() {
@@ -163,6 +166,10 @@ export function NewEstimateScreen({ route, navigation }: any) {
   // Store original id when editing so we upsert the same record
   const editingIdRef = useRef<string | undefined>(undefined);
   const [aiHistory, setAiHistory] = useState<AiScanRecord[]>([]);
+  const [customerId, setCustomerId] = useState<string | undefined>(undefined);
+  const [customFields, setCustomFields] = useState<CustomIntakeField[]>([]);
+  const [customAnswers, setCustomAnswers] = useState<Record<string, AnswerValue>>({});
+  const estimateNumberRef = useRef<string | undefined>(undefined);
 
   const { show: showToast, Toast } = useToast();
 
@@ -191,6 +198,8 @@ export function NewEstimateScreen({ route, navigation }: any) {
 
           // Prefill answers
           setAnswers(est.intakeAnswers ?? {});
+          setCustomerId(est.customerId);
+          estimateNumberRef.current = est.estimateNumber;
         });
       }
     });
@@ -203,11 +212,33 @@ export function NewEstimateScreen({ route, navigation }: any) {
     }, [estimateId]),
   );
 
+  // Load template custom intake fields when vertical/service changes
+  useEffect(() => {
+    if (!vertical?.id || !service?.id) return;
+    getTemplate(vertical.id, service.id).then(tmpl => {
+      setCustomFields(tmpl?.customIntakeFields ?? []);
+      setCustomAnswers({});
+    });
+  }, [vertical?.id, service?.id]);
+
   // BUG FIX: guard against out-of-bounds index after verticals reload
   const safeVertIdx = Math.min(verticalIdx, verticals.length - 1);
   const vertical    = verticals[safeVertIdx];
   const safeSvcIdx  = Math.min(serviceIdx, (vertical?.services?.length ?? 1) - 1);
   const service     = vertical?.services?.[safeSvcIdx];
+
+  // Extract AI confidence metadata from answers for badge display
+  const aiMeta = useMemo(() => {
+    const meta: Record<string, { confidence: string }> = {};
+    const suffix = '__ai_confidence';
+    for (const [k, v] of Object.entries(answers)) {
+      if (k.endsWith(suffix)) {
+        const qId = k.slice(0, -suffix.length);
+        meta[qId] = { confidence: String(v) };
+      }
+    }
+    return meta;
+  }, [answers]);
 
   // Live pricing — recomputes whenever answers, vertical, service, or overrides change
   const livePricing: PricingResultV2 | null = useMemo(() => {
@@ -228,6 +259,7 @@ export function NewEstimateScreen({ route, navigation }: any) {
     setAnswers({});
     setFieldErrors({});
     setDriverOverrides({});
+    setCustomAnswers({});
   };
 
   const buildEstimate = (status: 'draft' | 'pending'): Estimate => {
@@ -250,6 +282,8 @@ export function NewEstimateScreen({ route, navigation }: any) {
       driverOverrides: Object.keys(driverOverrides).length ? driverOverrides : undefined,
       disclaimerText:  vertical!.disclaimerText,
       photos:  [],
+      customerId,
+      estimateNumber: estimateNumberRef.current,
       createdAt: now,
       updatedAt: now,
     };
@@ -291,6 +325,10 @@ export function NewEstimateScreen({ route, navigation }: any) {
 
     setSaving(true);
     try {
+      // Generate estimate number on first pending save
+      if (!estimateNumberRef.current) {
+        estimateNumberRef.current = await nextEstimateNumber();
+      }
       const estimate = buildEstimate('pending');
       editingIdRef.current = estimate.id;
       await EstimateRepository.upsertEstimate(estimate);
@@ -316,8 +354,20 @@ export function NewEstimateScreen({ route, navigation }: any) {
 
         {/* Customer */}
         <Text style={styles.section}>Customer</Text>
+        <CustomerPicker
+          customerId={customerId}
+          onSelect={c => {
+            if (c) {
+              setCustomerId(c.id);
+              setCustomerName(c.name);
+              setCustomerPhone(c.phone ?? '');
+            } else {
+              setCustomerId(undefined);
+            }
+          }}
+        />
         <TextInput
-          style={[styles.input, nameError ? styles.inputError : null]}
+          style={[styles.input, nameError ? styles.inputError : null, { marginTop: 10 }]}
           placeholder="Full name (optional for draft)"
           placeholderTextColor="#475569"
           value={customerName}
@@ -380,6 +430,10 @@ export function NewEstimateScreen({ route, navigation }: any) {
               answers={answers}
               onChange={handleAnswer}
               errors={fieldErrors}
+              customFields={customFields}
+              customAnswers={customAnswers}
+              onCustomChange={(id, v) => setCustomAnswers(prev => ({ ...prev, [id]: v }))}
+              aiMeta={aiMeta}
             />
           </>
         )}
