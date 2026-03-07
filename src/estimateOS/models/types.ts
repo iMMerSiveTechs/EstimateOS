@@ -244,12 +244,25 @@ export interface MaterialLineItem {
 
 // ─── Customer ──────────────────────────────────────────────────────────────
 
+export type PreferredContact = 'phone' | 'email' | 'text' | 'any';
+
+export const PREFERRED_CONTACT_LABELS: Record<PreferredContact, string> = {
+  phone: 'Phone call',
+  email: 'Email',
+  text:  'Text / SMS',
+  any:   'Any',
+};
+
 export interface Customer {
   id: string;
   name: string;
+  companyName?: string;           // business/company name (Phase 12+)
   phone?: string;
   email?: string;
-  address?: string;
+  address?: string;               // service address
+  billingAddress?: string;        // if different from service address (Phase 12+)
+  preferredContact?: PreferredContact;  // (Phase 12+)
+  tags?: string[];                // e.g. ['roofing', 'repeat', 'referral'] (Phase 12+)
   notes?: string;
   // Follow-up workflow (Phase 6+)
   followUpStatus?: FollowUpStatus;
@@ -298,13 +311,30 @@ export interface Estimate {
 
 // ─── Invoices ──────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'void';
+export type InvoiceStatus = 'draft' | 'sent' | 'partially_paid' | 'paid' | 'overdue' | 'void';
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft:          'Draft',
+  sent:           'Sent',
+  partially_paid: 'Partial',
+  paid:           'Paid',
+  overdue:        'Overdue',
+  void:           'Void',
+};
 
 export interface InvoiceLineItem {
   id: string;
   label: string;
   unitCost: number;
   quantity: number;
+}
+
+export interface InvoicePaymentEvent {
+  id: string;
+  amount: number;                 // amount paid in this event
+  method?: string;                // e.g. "check", "cash", "card", "transfer"
+  note?: string;
+  recordedAt: string;             // ISO timestamp
 }
 
 export interface Invoice {
@@ -326,6 +356,10 @@ export interface Invoice {
   taxRate: number;                // 0.08 = 8%
   taxAmount?: number;             // snapshot
   totalAmount?: number;           // final total snapshot
+  // Payment tracking (Phase 12+)
+  amountPaid?: number;            // cumulative amount paid so far
+  paymentEvents?: InvoicePaymentEvent[];   // individual payment records
+  dueDate?: string;               // ISO date — if set, used to flag overdue
   // Payment
   paymentTerms: string;           // e.g. "Due on receipt", "Net 30"
   // Snapshot of business terms at invoice creation
@@ -623,19 +657,26 @@ export type TimelineEventType =
   | 'status_changed'
   | 'note_added'
   | 'won'
-  | 'lost';
+  | 'lost'
+  // Payment events (Phase 12+)
+  | 'payment_requested'
+  | 'payment_received'
+  | 'payment_plan_created';
 
 export const TIMELINE_EVENT_LABELS: Record<TimelineEventType, string> = {
-  intake_created:     'Lead created',
-  estimate_created:   'Estimate created',
-  quote_sent:         'Quote sent',
-  followup_scheduled: 'Follow-up scheduled',
-  reminder_completed: 'Reminder completed',
-  invoice_created:    'Invoice created',
-  status_changed:     'Status changed',
-  note_added:         'Note added',
-  won:                'Marked as Won',
-  lost:               'Marked as Lost',
+  intake_created:       'Lead created',
+  estimate_created:     'Estimate created',
+  quote_sent:           'Quote sent',
+  followup_scheduled:   'Follow-up scheduled',
+  reminder_completed:   'Reminder completed',
+  invoice_created:      'Invoice created',
+  status_changed:       'Status changed',
+  note_added:           'Note added',
+  won:                  'Marked as Won',
+  lost:                 'Marked as Lost',
+  payment_requested:    'Payment requested',
+  payment_received:     'Payment received',
+  payment_plan_created: 'Payment plan created',
 };
 
 export interface TimelineEvent {
@@ -667,6 +708,120 @@ export interface IntakeDraft {
   nextActionNote?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── Payment architecture (Phase 12+) ─────────────────────────────────────
+// SERVICE PAYMENTS: customer pays for real-world roofing/service work.
+// APP MONETIZATION: business user pays for software features (separate module).
+
+// --- Service payment types -----------------------------------------------
+
+export type ServicePaymentStatus =
+  | 'pending'        // request created, not yet paid
+  | 'partially_paid' // some amount received
+  | 'paid'           // fully settled
+  | 'cancelled';
+
+export const SERVICE_PAYMENT_STATUS_LABELS: Record<ServicePaymentStatus, string> = {
+  pending:        'Pending',
+  partially_paid: 'Partially Paid',
+  paid:           'Paid',
+  cancelled:      'Cancelled',
+};
+
+export type DepositType = 'none' | 'fixed' | 'percentage';
+
+/** A payment request attached to an accepted estimate or invoice. */
+export interface PaymentRequest {
+  id: string;
+  estimateId?: string;
+  invoiceId?: string;
+  customerId?: string;
+  depositType: DepositType;
+  depositAmount?: number;         // flat dollar amount (when depositType === 'fixed')
+  depositPct?: number;            // 0–1 fraction (when depositType === 'percentage')
+  totalDue: number;               // full amount requested
+  status: ServicePaymentStatus;
+  amountPaid: number;             // cumulative paid so far
+  payments: ServicePaymentRecord[]; // individual payment receipts
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One recorded payment against a PaymentRequest or Invoice. */
+export interface ServicePaymentRecord {
+  id: string;
+  paymentRequestId?: string;
+  invoiceId?: string;
+  amount: number;
+  method?: string;                // 'check' | 'cash' | 'card' | 'transfer' | 'other'
+  referenceNumber?: string;       // check #, transaction ID, etc.
+  note?: string;
+  recordedAt: string;             // ISO timestamp
+}
+
+// --- Payment plan types --------------------------------------------------
+
+export type PaymentPlanStatus = 'active' | 'completed' | 'cancelled';
+
+export type PaymentStageStatus = 'pending' | 'paid' | 'overdue';
+
+export interface PaymentStage {
+  id: string;
+  label: string;                  // e.g. "Deposit", "Progress Payment", "Final Balance"
+  amount: number;
+  dueDate?: string;               // ISO date; optional
+  status: PaymentStageStatus;
+  paidAt?: string;
+  note?: string;
+}
+
+/** A milestone-based or installment-based payment plan tied to a service job. */
+export interface PaymentPlan {
+  id: string;
+  estimateId?: string;
+  invoiceId?: string;
+  customerId?: string;
+  name: string;                   // e.g. "3-Part Roofing Plan"
+  totalAmount: number;
+  stages: PaymentStage[];
+  status: PaymentPlanStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- App monetization types (separate from service payments) --------------
+// These apply to the business operator's use of the app software,
+// NOT to customer payments for real-world service jobs.
+
+export type AppPlanTier = 'free' | 'starter' | 'pro' | 'enterprise';
+
+export const APP_PLAN_LABELS: Record<AppPlanTier, string> = {
+  free:       'Free',
+  starter:    'Starter',
+  pro:        'Pro',
+  enterprise: 'Enterprise',
+};
+
+export type AppSubscriptionState = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'none';
+
+export interface AppSubscriptionStatus {
+  tier: AppPlanTier;
+  state: AppSubscriptionState;
+  expiresAt?: string;             // ISO timestamp; undefined = no expiry (free)
+  // Feature entitlements
+  aiCreditsIncluded: number;      // credits per billing period; 0 on free
+  maxEstimates?: number;          // undefined = unlimited
+  maxCustomers?: number;
+  premiumPricingRules: boolean;
+  customVerticals: boolean;
+  paymentPlans: boolean;
+  prioritySupport: boolean;
+  // Provider reference (future hookup)
+  providerCustomerId?: string;    // RevenueCat / App Store customer ID
+  providerSubscriptionId?: string;
 }
 
 // ─── Sync status ────────────────────────────────────────────────────────────

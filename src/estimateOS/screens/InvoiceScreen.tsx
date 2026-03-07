@@ -2,49 +2,154 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  SafeAreaView, Alert, ActivityIndicator, Share,
+  SafeAreaView, Alert, ActivityIndicator, Share, Modal,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Invoice, InvoiceLineItem } from '../models/types';
+import { Invoice, InvoiceLineItem, InvoicePaymentEvent, INVOICE_STATUS_LABELS } from '../models/types';
 import { InvoiceRepository } from '../storage/invoices';
 import { getBusinessProfile } from '../storage/settings';
 import { TimelineRepository } from '../storage/workflow';
 import { makeId } from '../domain/id';
 import { T, radii } from '../theme';
 
-const INV_STATUS: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  draft: { bg: T.surface,  border: T.border, text: T.sub,     label: 'Draft' },
-  sent:  { bg: T.amberLo,  border: T.amber,  text: T.amberHi, label: 'Sent' },
-  paid:  { bg: T.greenLo,  border: T.green,  text: T.greenHi, label: 'Paid' },
-  void:  { bg: T.redLo,    border: T.red,    text: T.red,     label: 'Void' },
+// ─── Status badge ─────────────────────────────────────────────────────────
+
+const INV_STATUS: Record<string, { bg: string; border: string; text: string }> = {
+  draft:          { bg: T.surface,  border: T.border, text: T.sub     },
+  sent:           { bg: T.amberLo,  border: T.amber,  text: T.amberHi },
+  partially_paid: { bg: T.indigoLo, border: T.indigo, text: T.indigoHi },
+  paid:           { bg: T.greenLo,  border: T.green,  text: T.greenHi },
+  overdue:        { bg: T.redLo,    border: T.red,     text: T.red    },
+  void:           { bg: T.redLo,    border: T.red,     text: T.red    },
 };
 
 function StatusBadge({ status }: { status: string }) {
   const c = INV_STATUS[status] ?? INV_STATUS.draft;
+  const label = INVOICE_STATUS_LABELS[status as keyof typeof INVOICE_STATUS_LABELS] ?? status;
   return (
     <View style={[sb.wrap, { backgroundColor: c.bg, borderColor: c.border }]}>
-      <Text style={[sb.txt, { color: c.text }]}>{c.label}</Text>
+      <Text style={[sb.txt, { color: c.text }]}>{label}</Text>
     </View>
   );
 }
 const sb = StyleSheet.create({
   wrap: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
-  txt: { fontSize: 12, fontWeight: '700' },
+  txt:  { fontSize: 12, fontWeight: '700' },
 });
 
 function SectionHeader({ title }: { title: string }) {
-  return <Text style={sh.txt}>{title}</Text>;
+  return <Text style={shdr.txt}>{title}</Text>;
 }
-const sh = StyleSheet.create({ txt: { color: T.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 28, marginBottom: 10 } });
+const shdr = StyleSheet.create({ txt: { color: T.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 28, marginBottom: 10 } });
+
+// ─── Record Payment Modal ─────────────────────────────────────────────────
+
+const PAYMENT_METHODS = ['Cash', 'Check', 'Card', 'Transfer', 'Other'];
+
+function RecordPaymentModal({ visible, remaining, onClose, onSave }: {
+  visible: boolean;
+  remaining: number;
+  onClose: () => void;
+  onSave: (event: Omit<InvoicePaymentEvent, 'id'>) => void;
+}) {
+  const [amountInput, setAmountInput] = useState('');
+  const [method, setMethod] = useState('');
+  const [note, setNote] = useState('');
+  const [amtErr, setAmtErr] = useState('');
+
+  const reset = () => { setAmountInput(''); setMethod(''); setNote(''); setAmtErr(''); };
+
+  const handleSave = () => {
+    const amt = parseFloat(amountInput);
+    if (!amountInput.trim() || isNaN(amt) || amt <= 0) { setAmtErr('Enter a valid amount'); return; }
+    if (amt > remaining + 0.01) { setAmtErr(`Max amount is $${remaining.toFixed(2)}`); return; }
+    onSave({ amount: amt, method: method.trim() || undefined, note: note.trim() || undefined, recordedAt: new Date().toISOString() });
+    reset();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { reset(); onClose(); }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={rp.overlay}>
+          <View style={rp.sheet}>
+            <Text style={rp.title}>Record Payment</Text>
+            <Text style={rp.sub}>Remaining balance: ${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+
+            <Text style={rp.label}>Amount *</Text>
+            <TextInput
+              style={[rp.input, amtErr ? rp.inputErr : null]}
+              value={amountInput}
+              onChangeText={t => { setAmountInput(t); setAmtErr(''); }}
+              placeholder="0.00"
+              placeholderTextColor={T.muted}
+              keyboardType="decimal-pad"
+              autoFocus
+            />
+            {amtErr ? <Text style={rp.err}>{amtErr}</Text> : null}
+
+            <Text style={rp.label}>Payment Method</Text>
+            <View style={rp.methodRow}>
+              {PAYMENT_METHODS.map(m => (
+                <TouchableOpacity
+                  key={m}
+                  style={[rp.methodChip, method === m && rp.methodChipActive]}
+                  onPress={() => setMethod(prev => prev === m ? '' : m)}
+                >
+                  <Text style={[rp.methodTxt, method === m && rp.methodTxtActive]}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={rp.label}>Note (optional)</Text>
+            <TextInput style={rp.input} value={note} onChangeText={setNote} placeholder="Check #, reference, etc." placeholderTextColor={T.muted} />
+
+            <View style={rp.btnRow}>
+              <TouchableOpacity style={rp.cancelBtn} onPress={() => { reset(); onClose(); }}>
+                <Text style={rp.cancelTxt}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={rp.saveBtn} onPress={handleSave}>
+                <Text style={rp.saveTxt}>Record</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+const rp = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: T.bg, borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl, padding: 24, paddingBottom: 40, borderWidth: 1, borderColor: T.border },
+  title: { color: T.text, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  sub: { color: T.sub, fontSize: 13, marginBottom: 16 },
+  label: { color: T.textDim, fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 14 },
+  input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 12, fontSize: 15 },
+  inputErr: { borderColor: T.red },
+  err: { color: T.red, fontSize: 12, marginTop: 4 },
+  methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  methodChip: { borderWidth: 1, borderColor: T.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
+  methodChipActive: { backgroundColor: T.accent, borderColor: T.accent },
+  methodTxt: { color: T.sub, fontSize: 13 },
+  methodTxtActive: { color: '#fff', fontWeight: '700' },
+  btnRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  cancelBtn: { flex: 1, borderWidth: 1, borderColor: T.border, borderRadius: radii.md, padding: 14, alignItems: 'center' },
+  cancelTxt: { color: T.sub, fontWeight: '600', fontSize: 15 },
+  saveBtn: { flex: 1, backgroundColor: T.green, borderRadius: radii.md, padding: 14, alignItems: 'center' },
+  saveTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────
 
 export function InvoiceScreen({ route, navigation }: any) {
   const { invoiceId } = route?.params ?? {};
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [invoice, setInvoice]   = useState<Invoice | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
   const [taxInput, setTaxInput] = useState('0');
-  const [terms, setTerms] = useState('Due on receipt');
-  const [notes, setNotes] = useState('');
+  const [terms, setTerms]       = useState('Due on receipt');
+  const [notes, setNotes]       = useState('');
+  const [showRecordPayment, setShowRecordPayment] = useState(false);
 
   const load = useCallback(async () => {
     if (!invoiceId) return;
@@ -67,11 +172,14 @@ export function InvoiceScreen({ route, navigation }: any) {
 
   const canEdit  = invoice.status === 'draft';
   const isVoided = invoice.status === 'void';
+  const canReceivePayment = invoice.status === 'sent' || invoice.status === 'partially_paid' || invoice.status === 'overdue';
 
-  const subtotal = invoice.lineItems.reduce((sum, li) => sum + li.unitCost * li.quantity, 0);
-  const taxRate = Math.min(1, Math.max(0, Number(taxInput) / 100 || 0));
-  const taxAmt = subtotal * taxRate;
-  const total = subtotal + taxAmt;
+  const subtotal  = invoice.lineItems.reduce((sum, li) => sum + li.unitCost * li.quantity, 0);
+  const taxRate   = Math.min(1, Math.max(0, Number(taxInput) / 100 || 0));
+  const taxAmt    = subtotal * taxRate;
+  const total     = subtotal + taxAmt;
+  const amountPaid = invoice.amountPaid ?? 0;
+  const remaining  = Math.max(0, total - amountPaid);
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -85,8 +193,11 @@ export function InvoiceScreen({ route, navigation }: any) {
     setSaving(true);
     const now = new Date().toISOString();
     try {
-      await save({ status, sentAt: status === 'sent' ? now : invoice.sentAt, paidAt: status === 'paid' ? now : invoice.paidAt });
-      // Record timeline event when status changes meaningfully
+      await save({
+        status,
+        sentAt: status === 'sent' ? now : invoice.sentAt,
+        paidAt: status === 'paid' ? now : invoice.paidAt,
+      });
       if (invoice.customerId && (status === 'sent' || status === 'paid')) {
         await TimelineRepository.appendEvent({
           customerId: invoice.customerId,
@@ -97,6 +208,37 @@ export function InvoiceScreen({ route, navigation }: any) {
         });
       }
     } finally { setSaving(false); }
+  };
+
+  const handleRecordPayment = async (event: Omit<InvoicePaymentEvent, 'id'>) => {
+    if (!invoice) return;
+    const newEvent: InvoicePaymentEvent = { ...event, id: makeId() };
+    const newAmountPaid = amountPaid + event.amount;
+    const newStatus: Invoice['status'] = newAmountPaid >= total - 0.01 ? 'paid' : 'partially_paid';
+    const updated: Invoice = {
+      ...invoice,
+      amountPaid: newAmountPaid,
+      paymentEvents: [...(invoice.paymentEvents ?? []), newEvent],
+      status: newStatus,
+      paidAt: newStatus === 'paid' ? new Date().toISOString() : invoice.paidAt,
+      updatedAt: new Date().toISOString(),
+    };
+    setInvoice(updated);
+    await InvoiceRepository.upsertInvoice(updated);
+    setShowRecordPayment(false);
+
+    if (invoice.customerId) {
+      await TimelineRepository.appendEvent({
+        customerId: invoice.customerId,
+        invoiceId: invoice.id,
+        type: 'payment_received',
+        note: `$${fmt(event.amount)} received${event.method ? ` via ${event.method}` : ''}`,
+      });
+    }
+  };
+
+  const markOverdue = async () => {
+    await save({ status: 'overdue' });
   };
 
   const updateLineItem = (idx: number, field: keyof InvoiceLineItem, value: string) => {
@@ -130,6 +272,8 @@ export function InvoiceScreen({ route, navigation }: any) {
       `Subtotal: $${fmt(subtotal)}`,
       taxRate > 0 ? `Tax (${Math.round(taxRate * 100)}%): $${fmt(taxAmt)}` : null,
       `TOTAL: $${fmt(total)}`,
+      amountPaid > 0 ? `Paid: $${fmt(amountPaid)}` : null,
+      amountPaid > 0 ? `Balance Due: $${fmt(remaining)}` : null,
       invoice.notes ? `\nNotes: ${invoice.notes}` : null,
     ].filter(Boolean).join('\n');
 
@@ -153,6 +297,32 @@ export function InvoiceScreen({ route, navigation }: any) {
           {invoice.paidAt && <Text style={s.invDate}>Paid: {new Date(invoice.paidAt).toLocaleDateString()}</Text>}
           {invoice.voidedAt && <Text style={[s.invDate, { color: T.red }]}>Voided: {new Date(invoice.voidedAt).toLocaleDateString()}{invoice.voidReason ? ` — ${invoice.voidReason}` : ''}</Text>}
         </View>
+
+        {/* Payment balance tracker (if any payments recorded or partially paid) */}
+        {(amountPaid > 0 || invoice.status === 'overdue') && (
+          <View style={s.balanceCard}>
+            <View style={s.balanceRow}>
+              <Text style={s.balanceLabel}>Total</Text>
+              <Text style={s.balanceAmt}>${fmt(total)}</Text>
+            </View>
+            <View style={s.balanceRow}>
+              <Text style={s.balancePaidLabel}>Amount Paid</Text>
+              <Text style={s.balancePaidAmt}>–${fmt(amountPaid)}</Text>
+            </View>
+            <View style={[s.balanceRow, s.balanceRowFinal]}>
+              <Text style={s.balanceDueLabel}>Balance Due</Text>
+              <Text style={[s.balanceDueAmt, invoice.status === 'overdue' ? { color: T.red } : null]}>
+                ${fmt(remaining)}
+              </Text>
+            </View>
+            {/* Progress bar */}
+            {total > 0 && (
+              <View style={s.progressTrack}>
+                <View style={[s.progressBar, { width: `${Math.min(100, (amountPaid / total) * 100)}%` as any }]} />
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Line Items */}
         <SectionHeader title="Line Items" />
@@ -212,22 +382,62 @@ export function InvoiceScreen({ route, navigation }: any) {
           <View style={[s.totalRow, s.totalRowFinal]}><Text style={s.totalFinalLabel}>Total</Text><Text style={s.totalFinalAmt}>${fmt(total)}</Text></View>
         </View>
 
+        {/* Payment history */}
+        {(invoice.paymentEvents ?? []).length > 0 && (
+          <>
+            <SectionHeader title={`Payment History (${invoice.paymentEvents!.length})`} />
+            {invoice.paymentEvents!.map((evt) => (
+              <View key={evt.id} style={s.paymentEventRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.paymentEventAmt}>+${fmt(evt.amount)}</Text>
+                  <Text style={s.paymentEventMeta}>
+                    {new Date(evt.recordedAt).toLocaleDateString()}
+                    {evt.method ? ` · ${evt.method}` : ''}
+                    {evt.note ? ` · ${evt.note}` : ''}
+                  </Text>
+                </View>
+                <View style={s.paymentEventDot} />
+              </View>
+            ))}
+          </>
+        )}
+
         {/* Actions */}
         <SectionHeader title="Actions" />
         <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
           <Text style={s.shareBtnTxt}>📤 Share / Export</Text>
         </TouchableOpacity>
+
+        {/* Draft → Sent */}
         {invoice.status === 'draft' && (
           <TouchableOpacity style={[s.actionBtn, { marginTop: 10 }]} onPress={() => markStatus('sent')} disabled={saving}>
             {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Sent</Text>}
           </TouchableOpacity>
         )}
-        {invoice.status === 'sent' && (
-          <TouchableOpacity style={[s.actionBtn, s.actionBtnGreen, { marginTop: 10 }]} onPress={() => markStatus('paid')} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={[s.actionBtnTxt, { color: '#fff' }]}>Mark as Paid ✓</Text>}
+
+        {/* Record partial / full payment */}
+        {canReceivePayment && (
+          <TouchableOpacity style={[s.actionBtn, s.actionBtnGreen, { marginTop: 10 }]} onPress={() => setShowRecordPayment(true)} disabled={saving}>
+            <Text style={[s.actionBtnTxt, { color: '#fff' }]}>💵 Record Payment</Text>
           </TouchableOpacity>
         )}
-        {(invoice.status === 'draft' || invoice.status === 'sent') && (
+
+        {/* Quick mark fully paid (when sent/overdue and no partial yet) */}
+        {(invoice.status === 'sent' || invoice.status === 'overdue') && amountPaid === 0 && (
+          <TouchableOpacity style={[s.actionBtn, { marginTop: 10 }]} onPress={() => markStatus('paid')} disabled={saving}>
+            {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Fully Paid ✓</Text>}
+          </TouchableOpacity>
+        )}
+
+        {/* Mark overdue (when sent) */}
+        {invoice.status === 'sent' && (
+          <TouchableOpacity style={[s.actionBtn, s.actionBtnAmber, { marginTop: 10 }]} onPress={markOverdue} disabled={saving}>
+            <Text style={[s.actionBtnTxt, { color: T.amberHi }]}>⚠️ Mark as Overdue</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Void */}
+        {(invoice.status === 'draft' || invoice.status === 'sent' || invoice.status === 'overdue') && (
           <TouchableOpacity style={[s.deleteBtn, { marginTop: 10 }]} onPress={() => Alert.alert(
             'Void Invoice',
             'Voiding marks this invoice as cancelled. It will not be deleted.',
@@ -242,6 +452,7 @@ export function InvoiceScreen({ route, navigation }: any) {
             <Text style={s.deleteBtnTxt}>Void Invoice</Text>
           </TouchableOpacity>
         )}
+
         <TouchableOpacity style={[s.deleteBtn, { marginTop: 10 }]} onPress={() => Alert.alert('Delete Invoice', 'Delete this invoice?', [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Delete', style: 'destructive', onPress: async () => { await InvoiceRepository.deleteInvoice(invoiceId); navigation.goBack(); }},
@@ -250,6 +461,13 @@ export function InvoiceScreen({ route, navigation }: any) {
         </TouchableOpacity>
 
       </ScrollView>
+
+      <RecordPaymentModal
+        visible={showRecordPayment}
+        remaining={remaining}
+        onClose={() => setShowRecordPayment(false)}
+        onSave={handleRecordPayment}
+      />
     </SafeAreaView>
   );
 }
@@ -264,6 +482,19 @@ const s = StyleSheet.create({
   customerName: { color: T.text, fontSize: 20, fontWeight: '700' },
   customerSub: { color: T.sub, fontSize: 13, marginTop: 2 },
   invDate: { color: T.muted, fontSize: 12, marginTop: 3 },
+  // Balance tracker
+  balanceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, marginTop: 12, gap: 8 },
+  balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  balanceRowFinal: { borderTopWidth: 1, borderTopColor: T.border, paddingTop: 8, marginTop: 4 },
+  balanceLabel: { color: T.textDim, fontSize: 14 },
+  balanceAmt: { color: T.text, fontSize: 14, fontWeight: '600' },
+  balancePaidLabel: { color: T.green, fontSize: 14 },
+  balancePaidAmt: { color: T.green, fontSize: 14, fontWeight: '600' },
+  balanceDueLabel: { color: T.text, fontSize: 15, fontWeight: '700' },
+  balanceDueAmt: { color: T.text, fontSize: 18, fontWeight: '800' },
+  progressTrack: { height: 6, backgroundColor: T.border, borderRadius: 3, overflow: 'hidden', marginTop: 4 },
+  progressBar: { height: '100%', backgroundColor: T.green, borderRadius: 3 },
+  // Line items
   lineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.border },
   lineInput: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 8, fontSize: 13 },
   lineLabel: { color: T.textDim, fontSize: 14 },
@@ -272,6 +503,7 @@ const s = StyleSheet.create({
   lineDel: { color: T.red, fontSize: 16, paddingLeft: 4 },
   addLineBtn: { borderWidth: 1, borderColor: T.border, borderStyle: 'dashed', borderRadius: radii.md, padding: 12, alignItems: 'center', marginTop: 8 },
   addLineTxt: { color: T.sub, fontSize: 14 },
+  // Tax & payment
   taxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   taxLabel: { color: T.textDim, fontSize: 14 },
   taxInput: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 8, fontSize: 14, width: 80, textAlign: 'center' },
@@ -281,6 +513,7 @@ const s = StyleSheet.create({
   fieldEmpty: { color: T.muted, fontSize: 14, fontStyle: 'italic' },
   input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 12, fontSize: 15 },
   inputMulti: { minHeight: 80, paddingTop: 10 },
+  // Totals
   totalsCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, marginTop: 16, gap: 10 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
   totalRowFinal: { borderTopWidth: 1, borderTopColor: T.border, paddingTop: 10, marginTop: 4 },
@@ -288,10 +521,17 @@ const s = StyleSheet.create({
   totalAmt: { color: T.text, fontSize: 14, fontWeight: '600' },
   totalFinalLabel: { color: T.text, fontSize: 16, fontWeight: '700' },
   totalFinalAmt: { color: T.text, fontSize: 20, fontWeight: '800' },
+  // Payment history
+  paymentEventRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: radii.md, padding: 12, borderWidth: 1, borderColor: T.border, marginBottom: 8 },
+  paymentEventAmt: { color: T.green, fontSize: 15, fontWeight: '700' },
+  paymentEventMeta: { color: T.sub, fontSize: 12, marginTop: 2 },
+  paymentEventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: T.green },
+  // Actions
   shareBtn: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.md, padding: 14, alignItems: 'center' },
   shareBtnTxt: { color: T.text, fontWeight: '600', fontSize: 15 },
   actionBtn: { borderWidth: 1, borderColor: T.accent, borderRadius: radii.md, padding: 14, alignItems: 'center' },
   actionBtnGreen: { backgroundColor: T.green, borderColor: T.green },
+  actionBtnAmber: { borderColor: T.amber, backgroundColor: T.amberLo },
   actionBtnTxt: { color: T.accent, fontWeight: '700', fontSize: 15 },
   deleteBtn: { borderWidth: 1, borderColor: T.redLo, borderRadius: radii.md, padding: 14, alignItems: 'center' },
   deleteBtnTxt: { color: T.red, fontWeight: '600', fontSize: 15 },

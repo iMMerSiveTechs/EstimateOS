@@ -5,7 +5,10 @@ import {
   SafeAreaView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Customer, Estimate, Invoice, FollowUpStatus } from '../models/types';
+import {
+  Customer, Estimate, Invoice, FollowUpStatus,
+  PreferredContact, PREFERRED_CONTACT_LABELS,
+} from '../models/types';
 import { CustomerRepository } from '../storage/customers';
 import { EstimateRepository } from '../storage/repository';
 import { InvoiceRepository } from '../storage/invoices';
@@ -20,6 +23,8 @@ function SectionHeader({ title }: { title: string }) {
 }
 const sh = StyleSheet.create({ txt: { color: T.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 28, marginBottom: 10 } });
 
+const CONTACT_OPTIONS: PreferredContact[] = ['any', 'phone', 'email', 'text'];
+
 export function CustomerDetailScreen({ route, navigation }: any) {
   const { customerId } = route?.params ?? {};
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -32,12 +37,16 @@ export function CustomerDetailScreen({ route, navigation }: any) {
   const [showComm, setShowComm] = useState(false);
 
   // Edit form state
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [notes, setNotes] = useState('');
-  const [nameErr, setNameErr] = useState('');
+  const [name, setName]                   = useState('');
+  const [companyName, setCompanyName]     = useState('');
+  const [phone, setPhone]                 = useState('');
+  const [email, setEmail]                 = useState('');
+  const [address, setAddress]             = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [preferredContact, setPreferredContact] = useState<PreferredContact>('any');
+  const [tagsInput, setTagsInput]         = useState('');  // comma-separated
+  const [notes, setNotes]                 = useState('');
+  const [nameErr, setNameErr]             = useState('');
 
   const load = useCallback(async () => {
     if (!customerId) return;
@@ -58,8 +67,16 @@ export function CustomerDetailScreen({ route, navigation }: any) {
 
   const startEdit = () => {
     if (!customer) return;
-    setName(customer.name); setPhone(customer.phone ?? ''); setEmail(customer.email ?? '');
-    setAddress(customer.address ?? ''); setNotes(customer.notes ?? ''); setNameErr('');
+    setName(customer.name);
+    setCompanyName(customer.companyName ?? '');
+    setPhone(customer.phone ?? '');
+    setEmail(customer.email ?? '');
+    setAddress(customer.address ?? '');
+    setBillingAddress(customer.billingAddress ?? '');
+    setPreferredContact(customer.preferredContact ?? 'any');
+    setTagsInput((customer.tags ?? []).join(', '));
+    setNotes(customer.notes ?? '');
+    setNameErr('');
     setEditing(true);
   };
 
@@ -68,7 +85,20 @@ export function CustomerDetailScreen({ route, navigation }: any) {
     if (!customer) return;
     setSaving(true);
     try {
-      const updated: Customer = { ...customer, name: name.trim(), phone: phone.trim() || undefined, email: email.trim() || undefined, address: address.trim() || undefined, notes: notes.trim() || undefined, updatedAt: new Date().toISOString() };
+      const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
+      const updated: Customer = {
+        ...customer,
+        name: name.trim(),
+        companyName: companyName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        address: address.trim() || undefined,
+        billingAddress: billingAddress.trim() || undefined,
+        preferredContact: preferredContact !== 'any' ? preferredContact : undefined,
+        tags: tags.length > 0 ? tags : undefined,
+        notes: notes.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+      };
       await CustomerRepository.upsertCustomer(updated);
       setCustomer(updated);
       setEditing(false);
@@ -88,10 +118,11 @@ export function CustomerDetailScreen({ route, navigation }: any) {
   if (loading) return <SafeAreaView style={s.safe}><ActivityIndicator style={{ marginTop: 60 }} color={T.accent} /></SafeAreaView>;
   if (!customer) return <SafeAreaView style={s.safe}><Text style={s.notFound}>Customer not found.</Text></SafeAreaView>;
 
+  // ── Edit form ─────────────────────────────────────────────────────────────
   if (editing) {
     return (
       <SafeAreaView style={s.safe}>
-        <ScrollView contentContainerStyle={s.scroll}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.editHeader}>
             <TouchableOpacity onPress={() => setEditing(false)}><Text style={s.cancel}>Cancel</Text></TouchableOpacity>
             <Text style={s.editTitle}>Edit Customer</Text>
@@ -99,18 +130,44 @@ export function CustomerDetailScreen({ route, navigation }: any) {
               {saving ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.saveBtn}>Save</Text>}
             </TouchableOpacity>
           </View>
-          {([
-            { label: 'Name *', value: name, setter: setName, key: 'phone-pad' as any, cap: 'words' as any, err: nameErr, onErr: setNameErr },
-          ]).map(() => null)}
+
           <Text style={s.label}>Name *</Text>
           <TextInput style={[s.input, nameErr ? s.inputErr : null]} value={name} onChangeText={t => { setName(t); setNameErr(''); }} placeholder="Full name" placeholderTextColor={T.muted} autoCapitalize="words" />
           {nameErr ? <Text style={s.err}>{nameErr}</Text> : null}
+
+          <Text style={s.label}>Company / Business Name</Text>
+          <TextInput style={s.input} value={companyName} onChangeText={setCompanyName} placeholder="Acme Corp (optional)" placeholderTextColor={T.muted} autoCapitalize="words" />
+
           <Text style={s.label}>Phone</Text>
           <TextInput style={s.input} value={phone} onChangeText={setPhone} placeholder="(555) 555-5555" placeholderTextColor={T.muted} keyboardType="phone-pad" />
+
           <Text style={s.label}>Email</Text>
           <TextInput style={s.input} value={email} onChangeText={setEmail} placeholder="email@example.com" placeholderTextColor={T.muted} keyboardType="email-address" autoCapitalize="none" />
-          <Text style={s.label}>Address</Text>
+
+          <Text style={s.label}>Service Address</Text>
           <TextInput style={[s.input, s.inputMulti]} value={address} onChangeText={setAddress} placeholder="Street, City, State ZIP" placeholderTextColor={T.muted} multiline numberOfLines={2} textAlignVertical="top" />
+
+          <Text style={s.label}>Billing Address</Text>
+          <TextInput style={[s.input, s.inputMulti]} value={billingAddress} onChangeText={setBillingAddress} placeholder="If different from service address" placeholderTextColor={T.muted} multiline numberOfLines={2} textAlignVertical="top" />
+
+          <Text style={s.label}>Preferred Contact</Text>
+          <View style={s.contactRow}>
+            {CONTACT_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt}
+                style={[s.contactChip, preferredContact === opt && s.contactChipActive]}
+                onPress={() => setPreferredContact(opt)}
+              >
+                <Text style={[s.contactChipTxt, preferredContact === opt && s.contactChipTxtActive]}>
+                  {PREFERRED_CONTACT_LABELS[opt]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={s.label}>Tags</Text>
+          <TextInput style={s.input} value={tagsInput} onChangeText={setTagsInput} placeholder="roofing, repeat, referral (comma-separated)" placeholderTextColor={T.muted} autoCapitalize="none" />
+
           <Text style={s.label}>Notes</Text>
           <TextInput style={[s.input, s.inputMulti]} value={notes} onChangeText={setNotes} placeholder="Notes…" placeholderTextColor={T.muted} multiline numberOfLines={3} textAlignVertical="top" />
         </ScrollView>
@@ -118,7 +175,8 @@ export function CustomerDetailScreen({ route, navigation }: any) {
     );
   }
 
-  // Timeline: merge estimates + invoices sorted by date
+  // ── View mode ─────────────────────────────────────────────────────────────
+
   type TimelineItem =
     | { kind: 'estimate'; item: Estimate; date: string }
     | { kind: 'invoice'; item: Invoice; date: string };
@@ -139,12 +197,32 @@ export function CustomerDetailScreen({ route, navigation }: any) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.customerName}>{customer.name}</Text>
+              {customer.companyName && <Text style={s.companyLine}>{customer.companyName}</Text>}
               {customer.phone && <Text style={s.infoLine}>📞 {customer.phone}</Text>}
               {customer.email && <Text style={s.infoLine}>✉️ {customer.email}</Text>}
               {customer.address && <Text style={s.infoLine}>📍 {customer.address}</Text>}
+              {customer.billingAddress && customer.billingAddress !== customer.address && (
+                <Text style={s.infoLine}>🧾 Billing: {customer.billingAddress}</Text>
+              )}
+              {customer.preferredContact && customer.preferredContact !== 'any' && (
+                <Text style={s.infoLine}>💬 Prefers {PREFERRED_CONTACT_LABELS[customer.preferredContact]}</Text>
+              )}
             </View>
           </View>
+
+          {/* Tags */}
+          {customer.tags && customer.tags.length > 0 && (
+            <View style={s.tagsRow}>
+              {customer.tags.map(tag => (
+                <View key={tag} style={s.tag}>
+                  <Text style={s.tagTxt}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {customer.notes && <Text style={s.notes}>{customer.notes}</Text>}
+
           <View style={s.cardActions}>
             <TouchableOpacity style={s.editBtn} onPress={startEdit}>
               <Text style={s.editBtnTxt}>Edit</Text>
@@ -257,8 +335,12 @@ const s = StyleSheet.create({
   cardTop: { flexDirection: 'row', gap: 14, marginBottom: 12 },
   bigAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: T.accentLo, alignItems: 'center', justifyContent: 'center' },
   bigAvatarTxt: { color: T.accent, fontSize: 24, fontWeight: '700' },
-  customerName: { color: T.text, fontSize: 20, fontWeight: '700', marginBottom: 4 },
+  customerName: { color: T.text, fontSize: 20, fontWeight: '700', marginBottom: 2 },
+  companyLine: { color: T.sub, fontSize: 13, marginBottom: 4 },
   infoLine: { color: T.sub, fontSize: 13, marginTop: 2 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: T.border },
+  tag: { backgroundColor: T.accentLo, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
+  tagTxt: { color: T.accentHi, fontSize: 11, fontWeight: '600' },
   notes: { color: T.textDim, fontSize: 13, lineHeight: 19, paddingTop: 10, borderTopWidth: 1, borderTopColor: T.border, marginTop: 10 },
   cardActions: { flexDirection: 'row', gap: 10, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: T.border },
   editBtn: { flex: 1, backgroundColor: T.accent, borderRadius: radii.md, padding: 11, alignItems: 'center' },
@@ -285,4 +367,10 @@ const s = StyleSheet.create({
   input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 12, fontSize: 15 },
   inputMulti: { minHeight: 70, paddingTop: 10 },
   inputErr: { borderColor: T.red }, err: { color: T.red, fontSize: 12, marginTop: 4 },
+  // Preferred contact chips
+  contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  contactChip: { borderWidth: 1, borderColor: T.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: T.surface },
+  contactChipActive: { backgroundColor: T.accent, borderColor: T.accent },
+  contactChipTxt: { color: T.sub, fontSize: 13 },
+  contactChipTxtActive: { color: '#fff', fontWeight: '700' },
 });
