@@ -42,8 +42,14 @@ export function EstimateListScreen({ navigation }: any) {
           contentContainerStyle={s.list}
           ListEmptyComponent={
             <View style={s.empty}>
+              <Text style={s.emptyIcon}>📝</Text>
               <Text style={s.emptyTitle}>No estimates yet</Text>
-              <Text style={s.emptySub}>Tap + to create your first estimate.</Text>
+              <Text style={s.emptySub}>
+                Create your first estimate — pick a service, answer a few{'\n'}questions, and get a price range instantly.
+              </Text>
+              <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('NewEstimate')}>
+                <Text style={s.emptyBtnTxt}>+ Create First Estimate</Text>
+              </TouchableOpacity>
             </View>
           }
           renderItem={({ item: est }) => {
@@ -86,9 +92,12 @@ export function EstimateListScreen({ navigation }: any) {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
   list: { padding: 16, paddingBottom: 100 },
-  empty: { marginTop: 80, alignItems: 'center' },
+  empty: { marginTop: 80, alignItems: 'center', paddingHorizontal: 32 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { color: T.text, fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptySub: { color: T.sub, fontSize: 14 },
+  emptySub: { color: T.sub, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyBtn: { backgroundColor: T.accent, borderRadius: radii.md, paddingHorizontal: 24, paddingVertical: 12, marginTop: 16 },
+  emptyBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: T.surface, borderRadius: radii.md,

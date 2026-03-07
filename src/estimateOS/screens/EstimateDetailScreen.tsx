@@ -325,6 +325,35 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           </>
         )}
 
+        {/* Next step hint */}
+        {estimate.status === 'draft' && (
+          <View style={s.nextStepCard}>
+            <Text style={s.nextStepIcon}>💡</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.nextStepTitle}>Next: Review and finalize</Text>
+              <Text style={s.nextStepSub}>Edit the estimate if needed, then send it to your customer or create an invoice.</Text>
+            </View>
+          </View>
+        )}
+        {estimate.status === 'pending' && invoices.length === 0 && (
+          <View style={s.nextStepCard}>
+            <Text style={s.nextStepIcon}>💡</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.nextStepTitle}>Next: Send to customer or create invoice</Text>
+              <Text style={s.nextStepSub}>Use "Review & Send" to email the estimate, or "Create Invoice" when the job is accepted.</Text>
+            </View>
+          </View>
+        )}
+        {(estimate.followUpStatus === 'quote_sent' || estimate.followUpStatus === 'follow_up_due') && (
+          <View style={s.nextStepCard}>
+            <Text style={s.nextStepIcon}>📞</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.nextStepTitle}>Follow up with {estimate.customer.name}</Text>
+              <Text style={s.nextStepSub}>Schedule a reminder or send a follow-up message using the buttons below.</Text>
+            </View>
+          </View>
+        )}
+
         {/* Actions */}
         <SectionHeader title="Actions" />
         <View style={s.actions}>
@@ -412,6 +441,11 @@ const s = StyleSheet.create({
   invoiceNum: { color: T.text, fontSize: 15, fontWeight: '600' },
   invoiceSub: { color: T.sub, fontSize: 12, marginTop: 2 },
   invoiceArrow: { color: T.sub, fontSize: 20 },
+
+  nextStepCard: { flexDirection: 'row', gap: 10, backgroundColor: T.accentLo, borderRadius: radii.lg, padding: 14, borderWidth: 1, borderColor: T.accent + '44', marginTop: 16 },
+  nextStepIcon: { fontSize: 18, marginTop: 1 },
+  nextStepTitle: { color: T.text, fontSize: 14, fontWeight: '700' },
+  nextStepSub: { color: T.sub, fontSize: 12, marginTop: 2, lineHeight: 17 },
 
   actions: { gap: 10 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, borderWidth: 1, borderColor: T.border },

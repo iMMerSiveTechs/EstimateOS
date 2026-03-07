@@ -12,6 +12,8 @@ import { EstimateRepository } from '../storage/repository';
 import { InvoiceRepository } from '../storage/invoices';
 import { CustomerRepository } from '../storage/customers';
 import { ReminderRepository, IntakeDraftRepository } from '../storage/workflow';
+import { getSettings } from '../storage/settings';
+import { GettingStartedChecklist, useGettingStartedDismissed, ChecklistContext } from '../components/GettingStartedChecklist';
 import { T, radii } from '../theme';
 
 // ─── Color map for follow-up status (local — theme-based) ────────────────────
@@ -71,22 +73,26 @@ export function OperationsDashboardScreen({ navigation }: any) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [drafts, setDrafts] = useState<IntakeDraft[]>([]);
+  const [hasProfile, setHasProfile] = useState(false);
+  const { dismissed: checklistDismissed, dismiss: dismissChecklist } = useGettingStartedDismissed();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [ests, invs, custs, rems, intakes] = await Promise.all([
+      const [ests, invs, custs, rems, intakes, settings] = await Promise.all([
         EstimateRepository.listEstimates(),
         InvoiceRepository.listInvoices(),
         CustomerRepository.listCustomers(),
         ReminderRepository.listPending(),
         IntakeDraftRepository.listByStatus('new'),
+        getSettings(),
       ]);
       setEstimates(ests);
       setInvoices(invs);
       setCustomers(custs);
       setReminders(rems);
       setDrafts(intakes);
+      setHasProfile(!!settings.businessProfile.businessName?.trim());
     } finally {
       setLoading(false);
     }
@@ -288,9 +294,25 @@ export function OperationsDashboardScreen({ navigation }: any) {
           </>
         )}
 
+        {/* Getting Started Checklist — shown until dismissed or all done */}
+        {checklistDismissed === false && !loading && (
+          <GettingStartedChecklist
+            context={{
+              hasBusinessProfile: hasProfile,
+              hasCustomer: customers.length > 0,
+              hasEstimate: estimates.length > 0,
+              hasInvoice: invoices.length > 0,
+              hasReminder: reminders.length > 0,
+              hasIntake: drafts.length > 0,
+            }}
+            navigation={navigation}
+            onDismiss={dismissChecklist}
+          />
+        )}
+
         {needsAttention.length === 0 && !loading && (() => {
           const isFirstRun = estimates.length === 0 && customers.length === 0 && invoices.length === 0;
-          if (isFirstRun) {
+          if (isFirstRun && checklistDismissed !== false) {
             return (
               <View style={s.firstRunCard}>
                 <Text style={s.firstRunTitle}>Welcome to EstimateOS</Text>
@@ -307,13 +329,16 @@ export function OperationsDashboardScreen({ navigation }: any) {
               </View>
             );
           }
-          return (
-            <View style={s.allClearCard}>
-              <Text style={s.allClearIcon}>✓</Text>
-              <Text style={s.allClearTxt}>All caught up</Text>
-              <Text style={s.allClearSub}>No overdue follow-ups or pending actions.</Text>
-            </View>
-          );
+          if (!isFirstRun) {
+            return (
+              <View style={s.allClearCard}>
+                <Text style={s.allClearIcon}>✓</Text>
+                <Text style={s.allClearTxt}>All caught up</Text>
+                <Text style={s.allClearSub}>No overdue follow-ups or pending actions.</Text>
+              </View>
+            );
+          }
+          return null;
         })()}
 
       </ScrollView>
