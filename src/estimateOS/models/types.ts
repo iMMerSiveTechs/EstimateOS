@@ -624,17 +624,44 @@ export interface Reminder {
 
 export type CommTemplateType =
   | 'estimate_followup'
+  | 'estimate_send'
+  | 'invoice_send'
   | 'appointment_reminder'
   | 'checkin'
   | 'invoice_reminder'
+  | 'payment_reminder'
   | 'missed_call';
 
 export const COMM_TEMPLATE_TYPE_LABELS: Record<CommTemplateType, string> = {
   estimate_followup:    'Estimate Follow-up',
+  estimate_send:        'Send Estimate',
+  invoice_send:         'Send Invoice',
   appointment_reminder: 'Appointment Reminder',
   checkin:              'Check-in',
   invoice_reminder:     'Invoice Reminder',
+  payment_reminder:     'Payment Reminder',
   missed_call:          'Missed Call Callback',
+};
+
+// ─── Communication intent (Phase 15B) ─────────────────────────────────────────
+
+export type CommIntent =
+  | 'estimate_send'
+  | 'invoice_send'
+  | 'follow_up'
+  | 'appointment_reminder'
+  | 'payment_reminder'
+  | 'callback_follow_up'
+  | 'general';
+
+export const COMM_INTENT_LABELS: Record<CommIntent, string> = {
+  estimate_send:        'Send Estimate',
+  invoice_send:         'Send Invoice',
+  follow_up:            'Follow Up',
+  appointment_reminder: 'Appointment Reminder',
+  payment_reminder:     'Payment Reminder',
+  callback_follow_up:   'Callback Follow-up',
+  general:              'General Message',
 };
 
 export interface CommTemplate {
@@ -651,7 +678,12 @@ export type TimelineEventType =
   | 'intake_created'
   | 'estimate_created'
   | 'quote_sent'
+  | 'estimate_sent'
+  | 'invoice_sent'
   | 'followup_scheduled'
+  | 'followup_sent'
+  | 'reminder_sent'
+  | 'payment_reminder_sent'
   | 'reminder_completed'
   | 'invoice_created'
   | 'status_changed'
@@ -664,19 +696,24 @@ export type TimelineEventType =
   | 'payment_plan_created';
 
 export const TIMELINE_EVENT_LABELS: Record<TimelineEventType, string> = {
-  intake_created:       'Lead created',
-  estimate_created:     'Estimate created',
-  quote_sent:           'Quote sent',
-  followup_scheduled:   'Follow-up scheduled',
-  reminder_completed:   'Reminder completed',
-  invoice_created:      'Invoice created',
-  status_changed:       'Status changed',
-  note_added:           'Note added',
-  won:                  'Marked as Won',
-  lost:                 'Marked as Lost',
-  payment_requested:    'Payment requested',
-  payment_received:     'Payment received',
-  payment_plan_created: 'Payment plan created',
+  intake_created:         'Lead created',
+  estimate_created:       'Estimate created',
+  quote_sent:             'Quote sent',
+  estimate_sent:          'Estimate sent',
+  invoice_sent:           'Invoice sent',
+  followup_scheduled:     'Follow-up scheduled',
+  followup_sent:          'Follow-up sent',
+  reminder_sent:          'Reminder sent',
+  payment_reminder_sent:  'Payment reminder sent',
+  reminder_completed:     'Reminder completed',
+  invoice_created:        'Invoice created',
+  status_changed:         'Status changed',
+  note_added:             'Note added',
+  won:                    'Marked as Won',
+  lost:                   'Marked as Lost',
+  payment_requested:      'Payment requested',
+  payment_received:       'Payment received',
+  payment_plan_created:   'Payment plan created',
 };
 
 export interface TimelineEvent {

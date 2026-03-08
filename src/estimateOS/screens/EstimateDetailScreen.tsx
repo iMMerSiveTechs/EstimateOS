@@ -5,17 +5,19 @@ import {
   SafeAreaView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Estimate, Invoice, MaterialLineItem, AiScanRecord, AI_META_PREFIX, AnswerValue, FollowUpStatus } from '../models/types';
+import { Estimate, Invoice, MaterialLineItem, AiScanRecord, AI_META_PREFIX, AnswerValue, FollowUpStatus, CommIntent, TimelineEventType } from '../models/types';
 import { EstimateRepository } from '../storage/repository';
 import { InvoiceRepository } from '../storage/invoices';
 import { getAiHistory } from '../storage/aiHistory';
-import { nextInvoiceNumber } from '../storage/settings';
+import { nextInvoiceNumber, getBusinessProfile } from '../storage/settings';
 import { makeId } from '../domain/id';
 import { TimelineRepository } from '../storage/workflow';
 import { MaterialsSection } from '../components/MaterialsSection';
 import { FollowUpPanel } from '../components/FollowUpPanel';
 import { ReminderSheet } from '../components/ReminderSheet';
 import { CommReviewModal } from '../components/CommReviewModal';
+import { generateEstimatePdf, sharePdf, isPdfAvailable } from '../services/pdfService';
+import { intentToTimelineEvent } from '../services/commProvider';
 import { T, radii } from '../theme';
 
 const STATUS_STYLE: Record<string, { bg: string; border: string; text: string; label: string }> = {
@@ -96,6 +98,9 @@ export function EstimateDetailScreen({ route, navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
   const [showComm, setShowComm] = useState(false);
+  const [commIntent, setCommIntent] = useState<CommIntent>('follow_up');
+  const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const load = useCallback(async () => {
     if (!estimateId) return;
@@ -201,6 +206,62 @@ export function EstimateDetailScreen({ route, navigation }: any) {
     await EstimateRepository.upsertEstimate(updated as Estimate);
   };
 
+  const handleExportPdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      const profile = await getBusinessProfile();
+      const result = await generateEstimatePdf(estimate, profile);
+      if (result.ok) {
+        setPdfUri(result.fileUri);
+        await sharePdf(result.fileUri, `Estimate ${estimate.estimateNumber ?? ''}`);
+      } else {
+        Alert.alert('PDF Error', result.error);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not generate PDF.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleSendEstimate = async () => {
+    // Generate PDF first, then open comm modal with attachment
+    setGeneratingPdf(true);
+    try {
+      const profile = await getBusinessProfile();
+      const result = await generateEstimatePdf(estimate, profile);
+      if (result.ok) {
+        setPdfUri(result.fileUri);
+      }
+    } catch { /* PDF optional — continue without */ }
+    setGeneratingPdf(false);
+    setCommIntent('estimate_send');
+    setShowComm(true);
+  };
+
+  const handleCommSent = async () => {
+    const eventType = intentToTimelineEvent(commIntent) as TimelineEventType;
+    if (commIntent === 'estimate_send') {
+      const updated = { ...estimate, followUpStatus: 'quote_sent' as FollowUpStatus, quoteSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      setEstimate(updated as Estimate);
+      await EstimateRepository.upsertEstimate(updated as Estimate);
+    }
+    if (estimate.customerId) {
+      await TimelineRepository.appendEvent({
+        customerId: estimate.customerId,
+        estimateId: estimate.id,
+        type: eventType,
+        note: commIntent === 'estimate_send'
+          ? `Estimate ${estimate.estimateNumber ?? ''} sent`
+          : commIntent === 'follow_up'
+          ? `Follow-up sent to ${estimate.customer.name}`
+          : `Communication sent`,
+      });
+    }
+    setShowComm(false);
+    setPdfUri(null);
+  };
+
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.scroll}>
@@ -276,8 +337,8 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           <TouchableOpacity style={s.commBtn} onPress={() => setShowReminder(true)}>
             <Text style={s.commBtnTxt}>⏰ Reminder</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.commBtn} onPress={() => setShowComm(true)}>
-            <Text style={s.commBtnTxt}>✉️ Send Message</Text>
+          <TouchableOpacity style={s.commBtn} onPress={() => { setCommIntent('follow_up'); setShowComm(true); }}>
+            <Text style={s.commBtnTxt}>✉️ Follow Up</Text>
           </TouchableOpacity>
         </View>
 
@@ -325,6 +386,35 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           </>
         )}
 
+        {/* Next step hint */}
+        {estimate.status === 'draft' && (
+          <View style={s.nextStepCard}>
+            <Text style={s.nextStepIcon}>💡</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.nextStepTitle}>Next: Review and finalize</Text>
+              <Text style={s.nextStepSub}>Edit the estimate if needed, then send it to your customer or create an invoice.</Text>
+            </View>
+          </View>
+        )}
+        {estimate.status === 'pending' && invoices.length === 0 && (
+          <View style={s.nextStepCard}>
+            <Text style={s.nextStepIcon}>💡</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.nextStepTitle}>Next: Send to customer or create invoice</Text>
+              <Text style={s.nextStepSub}>Use "Review & Send" to email the estimate, or "Create Invoice" when the job is accepted.</Text>
+            </View>
+          </View>
+        )}
+        {(estimate.followUpStatus === 'quote_sent' || estimate.followUpStatus === 'follow_up_due') && (
+          <View style={s.nextStepCard}>
+            <Text style={s.nextStepIcon}>📞</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.nextStepTitle}>Follow up with {estimate.customer.name}</Text>
+              <Text style={s.nextStepSub}>Schedule a reminder or send a follow-up message using the buttons below.</Text>
+            </View>
+          </View>
+        )}
+
         {/* Actions */}
         <SectionHeader title="Actions" />
         <View style={s.actions}>
@@ -336,9 +426,13 @@ export function EstimateDetailScreen({ route, navigation }: any) {
             {saving ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>🧾</Text>}
             <Text style={s.actionTxt}>Create Invoice</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtn} onPress={() => navigation.navigate('ReviewSend', { estimateId: estimate.id })}>
-            <Text style={s.actionIcon}>📤</Text>
-            <Text style={s.actionTxt}>Review & Send</Text>
+          <TouchableOpacity style={s.actionBtn} onPress={handleSendEstimate} disabled={generatingPdf}>
+            {generatingPdf ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>📤</Text>}
+            <Text style={s.actionTxt}>Send Estimate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionBtn} onPress={handleExportPdf} disabled={generatingPdf}>
+            {generatingPdf ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>📄</Text>}
+            <Text style={s.actionTxt}>Export PDF</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.actionBtn, s.actionBtnDanger]} onPress={handleDelete}>
             <Text style={s.actionIcon}>🗑️</Text>
@@ -362,23 +456,21 @@ export function EstimateDetailScreen({ route, navigation }: any) {
 
       <CommReviewModal
         visible={showComm}
-        templateType="estimate_followup"
+        intent={commIntent}
         vars={{
           customer_name: estimate.customer.name,
+          business_name: undefined,
           address: estimate.customer.address,
           estimate_number: estimate.estimateNumber,
           price_range: estimate.computedRange
             ? `$${estimate.computedRange.min.toLocaleString('en-US')} – $${estimate.computedRange.max.toLocaleString('en-US')}`
             : undefined,
         }}
-        onClose={() => setShowComm(false)}
-        onSent={async () => {
-          const updated = { ...estimate, followUpStatus: 'quote_sent' as FollowUpStatus, quoteSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-          setEstimate(updated as Estimate);
-          await EstimateRepository.upsertEstimate(updated as Estimate);
-          if (estimate.customerId) await TimelineRepository.appendEvent({ customerId: estimate.customerId, estimateId: estimate.id, type: 'quote_sent' });
-          setShowComm(false);
-        }}
+        recipientEmail={estimate.customer.email}
+        attachments={pdfUri ? [pdfUri] : undefined}
+        attachmentLabel={pdfUri ? `Estimate ${estimate.estimateNumber ?? ''} PDF` : undefined}
+        onClose={() => { setShowComm(false); setPdfUri(null); }}
+        onSent={handleCommSent}
       />
     </SafeAreaView>
   );
@@ -412,6 +504,11 @@ const s = StyleSheet.create({
   invoiceNum: { color: T.text, fontSize: 15, fontWeight: '600' },
   invoiceSub: { color: T.sub, fontSize: 12, marginTop: 2 },
   invoiceArrow: { color: T.sub, fontSize: 20 },
+
+  nextStepCard: { flexDirection: 'row', gap: 10, backgroundColor: T.accentLo, borderRadius: radii.lg, padding: 14, borderWidth: 1, borderColor: T.accent + '44', marginTop: 16 },
+  nextStepIcon: { fontSize: 18, marginTop: 1 },
+  nextStepTitle: { color: T.text, fontSize: 14, fontWeight: '700' },
+  nextStepSub: { color: T.sub, fontSize: 12, marginTop: 2, lineHeight: 17 },
 
   actions: { gap: 10 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, borderWidth: 1, borderColor: T.border },

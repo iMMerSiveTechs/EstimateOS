@@ -33,6 +33,47 @@ const NOW = new Date().toISOString();
 
 export const DEFAULT_COMM_TEMPLATES: CommTemplate[] = [
   {
+    id: 'default_estimate_send',
+    name: 'Send Estimate',
+    type: 'estimate_send',
+    subject: 'Your roofing estimate — {estimate_number}',
+    body: `Hi {customer_name},
+
+Thank you for the opportunity to provide an estimate for your property at {address}.
+
+Your estimated range: {price_range}
+
+Please find the full estimate details attached. If you have any questions or would like to discuss the scope of work, please don't hesitate to reach out.
+
+We look forward to working with you.
+
+Best regards,
+{business_name}`,
+    isDefault: true,
+    updatedAt: NOW,
+  },
+  {
+    id: 'default_invoice_send',
+    name: 'Send Invoice',
+    type: 'invoice_send',
+    subject: 'Invoice from {business_name} — {invoice_number}',
+    body: `Hi {customer_name},
+
+Please find your invoice attached for the work completed at {address}.
+
+Invoice: {invoice_number}
+Total: {invoice_total}
+
+Payment terms: {payment_terms}
+
+If you have any questions about this invoice, please don't hesitate to contact us.
+
+Thank you for your business,
+{business_name}`,
+    isDefault: true,
+    updatedAt: NOW,
+  },
+  {
     id: 'default_estimate_followup',
     name: 'Estimate Follow-up',
     type: 'estimate_followup',
@@ -94,6 +135,22 @@ This is a friendly reminder that your invoice is ready for review.
 If you have any questions about the charges or payment options, please feel free to reach out.
 
 Thank you for your business,
+{business_name}`,
+    isDefault: true,
+    updatedAt: NOW,
+  },
+  {
+    id: 'default_payment_reminder',
+    name: 'Payment Reminder',
+    type: 'payment_reminder',
+    subject: 'Payment reminder — {invoice_number}',
+    body: `Hi {customer_name},
+
+This is a friendly reminder that your invoice {invoice_number} has a remaining balance of {balance_due}.
+
+Please let us know if you have any questions about the invoice or need to discuss payment arrangements.
+
+Thank you,
 {business_name}`,
     isDefault: true,
     updatedAt: NOW,
@@ -164,15 +221,21 @@ export const CommTemplateRepository = {
 
 // ─── Template merge-field filler ──────────────────────────────────────────────
 
+export interface CommTemplateVars {
+  customer_name?: string;
+  business_name?: string;
+  estimate_number?: string;
+  price_range?: string;
+  address?: string;
+  invoice_number?: string;
+  invoice_total?: string;
+  payment_terms?: string;
+  balance_due?: string;
+}
+
 export function fillCommTemplate(
   body: string,
-  vars: {
-    customer_name?: string;
-    business_name?: string;
-    estimate_number?: string;
-    price_range?: string;
-    address?: string;
-  },
+  vars: CommTemplateVars,
 ): string {
   return body.replace(/\{(\w+)\}/g, (_, key) => (vars as Record<string, string>)[key] ?? `{${key}}`);
 }

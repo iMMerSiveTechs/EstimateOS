@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  SafeAreaView, Switch, ActivityIndicator, Animated,
+  SafeAreaView, Switch, ActivityIndicator, Animated, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AppSettings, AI_CREDITS_LOW_THRESHOLD } from '../models/types';
@@ -11,6 +11,7 @@ import { getSettings, saveSettings } from '../storage/settings';
 import { getCredits } from '../storage/aiCredits';
 import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
 import { deriveCapabilities } from '../services/capabilities';
+import { seedSampleData, clearPilotData } from '../storage/pilotTools';
 import { T, radii } from '../theme';
 
 function useToast() {
@@ -233,6 +234,49 @@ export function SettingsScreen({ navigation }: any) {
             <View style={{ flex: 1 }}>
               <Text style={s.navLabel}>Pricing Rules</Text>
               <Text style={s.navSub}>Manage custom pricing rules and vertical overrides</Text>
+            </View>
+            <Text style={s.navArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Pilot Tools (internal admin) ────────────────────────────── */}
+        <SectionHeader title="Pilot Tools" />
+        <View style={s.card}>
+          <TouchableOpacity style={s.navRow} onPress={async () => {
+            Alert.alert(
+              'Seed Sample Data',
+              'This will add sample customers, estimates, invoices, and reminders for testing. Existing data will not be deleted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Seed', onPress: async () => {
+                  const result = await seedSampleData();
+                  showToast(`Added ${result.customers} clients, ${result.estimates} estimates, ${result.invoices} invoices`);
+                }},
+              ],
+            );
+          }}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.navLabel}>Seed Sample Data</Text>
+              <Text style={s.navSub}>Add realistic test records for pilot testing</Text>
+            </View>
+            <Text style={s.navArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.navRow, { borderTopWidth: 1, borderTopColor: T.border }]} onPress={() => {
+            Alert.alert(
+              'Clear All Data',
+              'This will permanently delete all customers, estimates, invoices, reminders, and intake drafts. Settings and business profile are preserved.\n\nThis cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete Everything', style: 'destructive', onPress: async () => {
+                  await clearPilotData();
+                  showToast('All pilot data cleared');
+                }},
+              ],
+            );
+          }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.navLabel, { color: T.red }]}>Clear All Data</Text>
+              <Text style={s.navSub}>Delete all test records — settings are preserved</Text>
             </View>
             <Text style={s.navArrow}>›</Text>
           </TouchableOpacity>
