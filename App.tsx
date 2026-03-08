@@ -16,8 +16,8 @@
 // navigate to any other screen regardless of which tab spawned it.
 
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View, StatusBar, Platform } from 'react-native';
+import React, { Component, useEffect, useState, ReactNode } from 'react';
+import { ActivityIndicator, View, Text, StatusBar, Platform, ScrollView } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -51,6 +51,40 @@ import { configureNotificationHandler } from './src/estimateOS/services/notifica
 // Configure local notification display behaviour (foreground alerts + Android channel).
 // Called at module load so it is set before any notification can arrive.
 configureNotificationHandler();
+
+// ─── Root error boundary ─────────────────────────────────────────────────────
+// Catches any JS error during render and shows it visually instead of black screen.
+
+interface ErrorBoundaryState { error: Error | null }
+
+class RootErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ color: '#ff4444', fontSize: 20, fontWeight: '700', marginBottom: 12 }}>
+            APP CRASH CAUGHT
+          </Text>
+          <ScrollView style={{ maxHeight: 400 }}>
+            <Text style={{ color: '#fff', fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
+              {this.state.error.message}
+            </Text>
+            <Text style={{ color: '#888', fontSize: 12, marginTop: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
+              {this.state.error.stack}
+            </Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─── Navigation theme ─────────────────────────────────────────────────────────
 
@@ -237,8 +271,17 @@ function AppGate() {
   // Waiting for Firebase auth state to resolve
   if (loading || (user && onboardingDone === null)) {
     return (
-      <View style={{ flex: 1, backgroundColor: T.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={T.accent} size="large" />
+      <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700', marginBottom: 16 }}>
+          NAV BOOT OK
+        </Text>
+        <Text style={{ color: '#aaa', fontSize: 14, marginBottom: 8 }}>
+          {loading ? 'Firebase auth loading...' : 'Checking onboarding...'}
+        </Text>
+        <Text style={{ color: '#666', fontSize: 12, marginBottom: 16 }}>
+          user={user ? 'yes' : 'null'} onboarding={String(onboardingDone)}
+        </Text>
+        <ActivityIndicator color="#fff" size="large" />
       </View>
     );
   }
@@ -263,13 +306,15 @@ function AppGate() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar barStyle="light-content" backgroundColor={T.bg} />
-        <NavigationContainer theme={NAV_THEME}>
-          <AppGate />
-        </NavigationContainer>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <RootErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <StatusBar barStyle="light-content" backgroundColor={T.bg} />
+          <NavigationContainer theme={NAV_THEME}>
+            <AppGate />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </RootErrorBoundary>
   );
 }
