@@ -9,12 +9,18 @@
     },
     "preview": {
       "distribution": "internal",
+      "cache": {
+        "disabled": true
+      },
       "ios": {
         "simulator": false
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "cache": {
+        "disabled": true
+      }
     }
   },
   "submit": {
