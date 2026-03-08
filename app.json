@@ -18,7 +18,8 @@
         "NSCameraUsageDescription": "EstimateOS uses the camera to capture site photos for estimates.",
         "NSPhotoLibraryUsageDescription": "EstimateOS accesses your photo library to attach site photos to estimates.",
         "NSMicrophoneUsageDescription": "EstimateOS uses the microphone for video recording.",
-        "NSPhotoLibraryAddUsageDescription": "EstimateOS saves site photos to your photo library."
+        "NSPhotoLibraryAddUsageDescription": "EstimateOS saves site photos to your photo library.",
+        "NSUserNotificationsUsageDescription": "EstimateOS sends reminder notifications for follow-ups, appointments, and invoice reminders."
       }
     },
     "android": {
@@ -30,14 +31,26 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0B0F1A",
+          "sounds": [],
+          "mode": "production"
+        }
+      ]
     ],
     "extra": {
       "eas": {

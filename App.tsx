@@ -46,6 +46,11 @@ import { IntakeScreen }              from './src/estimateOS/screens/IntakeScreen
 import { EstimateListScreen }        from './src/estimateOS/screens/EstimateListScreen';
 
 import { T } from './src/estimateOS/theme';
+import { configureNotificationHandler } from './src/estimateOS/services/notificationService';
+
+// Configure local notification display behaviour (foreground alerts + Android channel).
+// Called at module load so it is set before any notification can arrive.
+configureNotificationHandler();
 
 // ─── Navigation theme ─────────────────────────────────────────────────────────
 
