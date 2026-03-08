@@ -13,6 +13,7 @@ import { InvoiceRepository } from '../storage/invoices';
 import { CustomerRepository } from '../storage/customers';
 import { ReminderRepository, IntakeDraftRepository } from '../storage/workflow';
 import { getSettings } from '../storage/settings';
+import { cancelScheduledNotification } from '../services/notificationService';
 import { GettingStartedChecklist, useGettingStartedDismissed, ChecklistContext } from '../components/GettingStartedChecklist';
 import { T, radii } from '../theme';
 
@@ -99,6 +100,14 @@ export function OperationsDashboardScreen({ navigation }: any) {
   }, []);
 
   useFocusEffect(load);
+
+  const handleCompleteReminder = async (reminder: Reminder) => {
+    // Cancel device notification first, then mark complete in repo
+    await cancelScheduledNotification(reminder.notificationId);
+    await ReminderRepository.completeReminder(reminder.id);
+    // Optimistic local removal — no full reload needed
+    setReminders(prev => prev.filter(r => r.id !== reminder.id));
+  };
 
   if (loading) return <SafeAreaView style={s.safe}><ActivityIndicator style={{ marginTop: 60 }} color={T.accent} /></SafeAreaView>;
 
@@ -244,6 +253,12 @@ export function OperationsDashboardScreen({ navigation }: any) {
                       <Text style={s.attentionTitle}>{item.reminder.customerName ?? 'Reminder'}</Text>
                       <Text style={s.attentionReason}>{item.reason}</Text>
                     </View>
+                    <TouchableOpacity
+                      style={s.doneBtn}
+                      onPress={() => handleCompleteReminder(item.reminder)}
+                    >
+                      <Text style={s.doneTxt}>Done</Text>
+                    </TouchableOpacity>
                   </View>
                 );
               }
@@ -368,6 +383,8 @@ const s = StyleSheet.create({
   attentionTitle: { color: T.text, fontSize: 14, fontWeight: '600' },
   attentionReason: { color: T.sub, fontSize: 12, marginTop: 2 },
   arrow: { color: T.sub, fontSize: 20 },
+  doneBtn: { backgroundColor: T.greenLo, borderWidth: 1, borderColor: T.green, borderRadius: radii.sm, paddingHorizontal: 12, paddingVertical: 6 },
+  doneTxt: { color: T.greenHi, fontSize: 12, fontWeight: '700' },
   allClearCard: { marginTop: 20, alignItems: 'center', padding: 40 },
   allClearIcon: { color: T.green, fontSize: 36, fontWeight: '800', marginBottom: 8 },
   allClearTxt: { color: T.text, fontSize: 18, fontWeight: '700' },

@@ -4,10 +4,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Modal, ScrollView, Platform, KeyboardAvoidingView,
+  Modal, ScrollView, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import { Reminder, ReminderType, REMINDER_TYPE_LABELS } from '../models/types';
 import { ReminderRepository } from '../storage/workflow';
+import { scheduleReminderNotification } from '../services/notificationService';
 import { T, radii } from '../theme';
 
 interface Props {
@@ -65,8 +66,25 @@ export function ReminderSheet({ visible, initial, onClose, onSaved }: Props) {
         dueDate,
         note,
       });
-      await ReminderRepository.upsertReminder(reminder);
-      onSaved(reminder);
+
+      // Schedule local notification — non-blocking, reminder saves regardless of result
+      const { notificationId, permissionStatus } = await scheduleReminderNotification(reminder);
+      const finalReminder: Reminder = notificationId
+        ? { ...reminder, notificationId }
+        : reminder;
+
+      await ReminderRepository.upsertReminder(finalReminder);
+
+      // If permission was explicitly denied, inform operator calmly after saving
+      if (permissionStatus === 'denied') {
+        Alert.alert(
+          'Reminder saved',
+          'Notifications are turned off for EstimateOS. Your reminder is saved and visible in the app — enable notifications in Settings to receive device alerts.',
+          [{ text: 'OK' }],
+        );
+      }
+
+      onSaved(finalReminder);
     } finally {
       setSaving(false);
     }

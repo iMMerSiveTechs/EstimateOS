@@ -619,6 +619,8 @@ export interface Reminder {
   note: string;
   completed: boolean;
   completedAt?: string;
+  /** expo-notifications scheduled notification ID, for cancellation on complete/delete. */
+  notificationId?: string;
   createdAt: string;
   updatedAt: string;
 }
