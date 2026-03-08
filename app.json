@@ -42,15 +42,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-image-picker",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#0B0F1A",
-          "sounds": []
-        }
-      ]
+      "expo-image-picker"
     ],
     "extra": {
       "eas": {
