@@ -1,18 +1,18 @@
 // ─── ReviewSendScreen ─────────────────────────────────────────────────────
-// Review an estimate and send via native email composer.
+// Review an estimate and send via email with PDF attachment.
+// Routes through commProvider.sendUnified() for consistent delivery.
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert, Share, KeyboardAvoidingView, Platform,
+  SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Estimate } from '../models/types';
 import { EstimateRepository } from '../storage/repository';
 import { getSettings, saveEmailTemplate } from '../storage/settings';
+import { sendUnified } from '../services/commProvider';
+import { generateEstimatePdf, isPdfAvailable } from '../services/pdfService';
+import { TimelineRepository } from '../storage/workflow';
 import { T, radii } from '../theme';
-
-// Try to use expo-mail-composer if available, fallback to Share
-let MailComposer: any = null;
-try { MailComposer = require('expo-mail-composer'); } catch {}
 
 function fillTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
@@ -28,6 +28,9 @@ export function ReviewSendScreen({ route, navigation }: any) {
   const [body, setBody] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(false);
   const [recipientErr, setRecipientErr] = useState('');
+  const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!estimateId) return;
@@ -53,6 +56,23 @@ export function ReviewSendScreen({ route, navigation }: any) {
           if (est.customer.email) setRecipients(est.customer.email);
           setSubject(fillTemplate(settings.emailTemplate.subject, vars));
           setBody(fillTemplate(settings.emailTemplate.body, vars));
+
+          // Generate PDF in background
+          if (isPdfAvailable()) {
+            setGeneratingPdf(true);
+            try {
+              const result = await generateEstimatePdf(est, settings.businessProfile);
+              if (result.ok) {
+                setPdfUri(result.fileUri);
+              } else {
+                setPdfError(result.error);
+              }
+            } catch (e: any) {
+              setPdfError(e?.message ?? 'Could not generate PDF');
+            } finally {
+              setGeneratingPdf(false);
+            }
+          }
         }
       } finally { setLoading(false); }
     })();
@@ -73,23 +93,55 @@ export function ReviewSendScreen({ route, navigation }: any) {
       // Save email template for next time
       await saveEmailTemplate(subject, body);
 
-      if (MailComposer && (await MailComposer.isAvailableAsync())) {
-        await MailComposer.composeAsync({
-          recipients: emails,
-          subject,
-          body,
-          // attachments: [] — PDF attachment goes here in Phase 2 when expo-print is wired
-        });
+      const result = await sendUnified({
+        intent: 'estimate_send',
+        action: 'email',
+        to: emails[0],
+        subject,
+        body,
+        attachments: pdfUri ? [pdfUri] : undefined,
+      });
+
+      if (result.status === 'success') {
+        // Log timeline event
+        if (estimate.customerId) {
+          await TimelineRepository.appendEvent({
+            customerId: estimate.customerId,
+            estimateId: estimate.id,
+            type: 'estimate_sent',
+            note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
+          });
+        }
+        navigation.goBack();
       } else {
-        // Fallback: native share sheet
-        await Share.share({
-          title: subject,
-          message: `To: ${emails.join(', ')}\nSubject: ${subject}\n\n${body}`,
-        });
+        Alert.alert('Send Issue', result.message ?? 'Could not complete send.');
       }
     } catch (e: any) {
-      Alert.alert('Send Failed', e?.message ?? 'Could not open mail composer.');
+      Alert.alert('Send Failed', e?.message ?? 'Could not send estimate.');
     } finally { setSending(false); }
+  };
+
+  const handleShare = async () => {
+    // Save template
+    await saveEmailTemplate(subject, body);
+
+    await sendUnified({
+      intent: 'estimate_send',
+      action: 'share',
+      subject,
+      body,
+      attachments: pdfUri ? [pdfUri] : undefined,
+    });
+
+    // Log timeline event
+    if (estimate.customerId) {
+      await TimelineRepository.appendEvent({
+        customerId: estimate.customerId,
+        estimateId: estimate.id,
+        type: 'estimate_sent',
+        note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+      });
+    }
   };
 
   const { computedRange: range } = estimate;
@@ -108,6 +160,24 @@ export function ReviewSendScreen({ route, navigation }: any) {
               ${(range?.min ?? 0).toLocaleString('en-US')} – ${(range?.max ?? 0).toLocaleString('en-US')}
             </Text>
           </View>
+
+          {/* PDF status badge */}
+          {generatingPdf && (
+            <View style={s.pdfBadge}>
+              <ActivityIndicator size="small" color={T.accent} />
+              <Text style={s.pdfBadgeTxt}>Generating PDF…</Text>
+            </View>
+          )}
+          {pdfUri && !generatingPdf && (
+            <View style={[s.pdfBadge, { backgroundColor: T.greenLo, borderColor: T.green }]}>
+              <Text style={[s.pdfBadgeTxt, { color: T.greenHi }]}>📎 PDF ready — will be attached to email</Text>
+            </View>
+          )}
+          {pdfError && !generatingPdf && (
+            <View style={[s.pdfBadge, { backgroundColor: T.amberLo, borderColor: T.amber }]}>
+              <Text style={[s.pdfBadgeTxt, { color: T.amberHi }]}>PDF not available — estimate text will be sent instead</Text>
+            </View>
+          )}
 
           {/* Recipients */}
           <Text style={s.fieldLabel}>To</Text>
@@ -154,16 +224,15 @@ export function ReviewSendScreen({ route, navigation }: any) {
             </View>
           )}
 
-          {/* Note about PDF */}
-          <View style={s.noteCard}>
-            <Text style={s.noteTxt}>
-              📎 PDF attachment — coming in a future update. For now, the estimate text is included in the email body.
-            </Text>
-          </View>
-
-          {/* Send button */}
+          {/* Send + Share buttons */}
           <TouchableOpacity style={s.sendBtn} onPress={handleSend} disabled={sending}>
-            {sending ? <ActivityIndicator color="#fff" /> : <Text style={s.sendBtnTxt}>📤 Send via Email</Text>}
+            {sending ? <ActivityIndicator color="#fff" /> : (
+              <Text style={s.sendBtnTxt}>{pdfUri ? '📎 Send with PDF' : '📤 Send via Email'}</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.shareSecondaryBtn} onPress={handleShare} disabled={sending}>
+            <Text style={s.shareSecondaryTxt}>{pdfUri ? '📄 Share PDF' : '📤 Share via Share Sheet'}</Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -176,11 +245,15 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
   scroll: { padding: 20, paddingBottom: 60 },
   notFound: { color: T.sub, fontSize: 16, textAlign: 'center', marginTop: 60 },
-  summaryCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, marginBottom: 24, alignItems: 'center' },
+  summaryCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, marginBottom: 16, alignItems: 'center' },
   summaryLabel: { color: T.sub, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 },
   summaryName: { color: T.text, fontSize: 20, fontWeight: '700' },
   summaryNum: { color: T.sub, fontSize: 12, marginTop: 4 },
   summaryRange: { color: T.accent, fontSize: 22, fontWeight: '800', marginTop: 6 },
+  // PDF badge
+  pdfBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.surface, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: T.border, marginBottom: 16 },
+  pdfBadgeTxt: { color: T.sub, fontSize: 12, fontWeight: '500' },
+  // Form
   fieldLabel: { color: T.textDim, fontSize: 13, fontWeight: '700', marginBottom: 6 },
   subLabel: { color: T.sub, fontSize: 12, marginBottom: 4, marginTop: 12 },
   input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.md, color: T.text, padding: 12, fontSize: 15, marginBottom: 4 },
@@ -193,8 +266,8 @@ const s = StyleSheet.create({
   previewCard: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.md, padding: 14, marginBottom: 16 },
   previewSubject: { color: T.text, fontSize: 14, fontWeight: '700', marginBottom: 8 },
   previewBody: { color: T.sub, fontSize: 13, lineHeight: 19 },
-  noteCard: { backgroundColor: T.amberLo, borderRadius: radii.md, padding: 12, borderWidth: 1, borderColor: T.amber, marginBottom: 20 },
-  noteTxt: { color: T.amberHi, fontSize: 12, lineHeight: 18 },
-  sendBtn: { backgroundColor: T.accent, borderRadius: radii.lg, paddingVertical: 16, alignItems: 'center' },
+  sendBtn: { backgroundColor: T.accent, borderRadius: radii.lg, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   sendBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  shareSecondaryBtn: { borderWidth: 1, borderColor: T.border, borderRadius: radii.lg, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
+  shareSecondaryTxt: { color: T.text, fontSize: 15, fontWeight: '600' },
 });

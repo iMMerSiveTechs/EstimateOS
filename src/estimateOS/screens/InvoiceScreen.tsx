@@ -6,11 +6,14 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Invoice, InvoiceLineItem, InvoicePaymentEvent, INVOICE_STATUS_LABELS } from '../models/types';
+import { Invoice, InvoiceLineItem, InvoicePaymentEvent, INVOICE_STATUS_LABELS, CommIntent, TimelineEventType } from '../models/types';
 import { InvoiceRepository } from '../storage/invoices';
 import { getBusinessProfile } from '../storage/settings';
 import { TimelineRepository } from '../storage/workflow';
 import { createInvoicePaymentEvent } from '../services/paymentProvider';
+import { generateInvoicePdf, sharePdf } from '../services/pdfService';
+import { intentToTimelineEvent } from '../services/commProvider';
+import { CommReviewModal } from '../components/CommReviewModal';
 import { makeId } from '../domain/id';
 import { T, radii } from '../theme';
 
@@ -151,6 +154,10 @@ export function InvoiceScreen({ route, navigation }: any) {
   const [terms, setTerms]       = useState('Due on receipt');
   const [notes, setNotes]       = useState('');
   const [showRecordPayment, setShowRecordPayment] = useState(false);
+  const [showComm, setShowComm] = useState(false);
+  const [commIntent, setCommIntent] = useState<CommIntent>('invoice_send');
+  const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const load = useCallback(async () => {
     if (!invoiceId) return;
@@ -257,7 +264,73 @@ export function InvoiceScreen({ route, navigation }: any) {
     setInvoice(prev => prev ? { ...prev, lineItems: prev.lineItems.filter((_, i) => i !== idx) } : prev);
   };
 
-  const handleShare = async () => {
+  const handleExportPdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      const profile = await getBusinessProfile();
+      const result = await generateInvoicePdf(invoice, profile);
+      if (result.ok) {
+        setPdfUri(result.fileUri);
+        await sharePdf(result.fileUri, `Invoice ${invoice.invoiceNumber}`);
+      } else {
+        Alert.alert('PDF Error', result.error);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not generate PDF.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    setGeneratingPdf(true);
+    try {
+      const profile = await getBusinessProfile();
+      const result = await generateInvoicePdf(invoice, profile);
+      if (result.ok) {
+        setPdfUri(result.fileUri);
+      }
+    } catch { /* PDF optional — continue without */ }
+    setGeneratingPdf(false);
+    setCommIntent('invoice_send');
+    setShowComm(true);
+  };
+
+  const handlePaymentReminder = async () => {
+    setGeneratingPdf(true);
+    try {
+      const profile = await getBusinessProfile();
+      const result = await generateInvoicePdf(invoice, profile);
+      if (result.ok) {
+        setPdfUri(result.fileUri);
+      }
+    } catch { /* PDF optional */ }
+    setGeneratingPdf(false);
+    setCommIntent('payment_reminder');
+    setShowComm(true);
+  };
+
+  const handleCommSent = async () => {
+    const eventType = intentToTimelineEvent(commIntent) as TimelineEventType;
+    if (commIntent === 'invoice_send' && invoice.status === 'draft') {
+      await markStatus('sent');
+    }
+    if (invoice.customerId) {
+      await TimelineRepository.appendEvent({
+        customerId: invoice.customerId,
+        invoiceId: invoice.id,
+        estimateId: invoice.estimateId,
+        type: eventType,
+        note: commIntent === 'invoice_send'
+          ? `Invoice ${invoice.invoiceNumber} sent`
+          : `Payment reminder for ${invoice.invoiceNumber}`,
+      });
+    }
+    setShowComm(false);
+    setPdfUri(null);
+  };
+
+  const handleShareText = async () => {
     const { businessName } = await getBusinessProfile();
     const lines = invoice.lineItems.map(li => `  ${li.label}: $${fmt(li.unitCost * li.quantity)}`).join('\n');
     const text = [
@@ -405,11 +478,22 @@ export function InvoiceScreen({ route, navigation }: any) {
 
         {/* Actions */}
         <SectionHeader title="Actions" />
-        <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
-          <Text style={s.shareBtnTxt}>📤 Share / Export</Text>
+        <TouchableOpacity style={s.shareBtn} onPress={handleSendInvoice} disabled={generatingPdf}>
+          {generatingPdf ? <ActivityIndicator color={T.text} /> : <Text style={s.shareBtnTxt}>📤 Send Invoice</Text>}
         </TouchableOpacity>
 
-        {/* Draft → Sent */}
+        <TouchableOpacity style={[s.shareBtn, { marginTop: 10 }]} onPress={handleExportPdf} disabled={generatingPdf}>
+          {generatingPdf ? <ActivityIndicator color={T.text} /> : <Text style={s.shareBtnTxt}>📄 Export PDF</Text>}
+        </TouchableOpacity>
+
+        {/* Payment reminder (when sent/partially_paid/overdue) */}
+        {canReceivePayment && (
+          <TouchableOpacity style={[s.actionBtn, s.actionBtnAmber, { marginTop: 10 }]} onPress={handlePaymentReminder} disabled={generatingPdf}>
+            <Text style={[s.actionBtnTxt, { color: T.amberHi }]}>💬 Send Payment Reminder</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Draft → Sent (manual status, if not using Send Invoice flow) */}
         {invoice.status === 'draft' && (
           <TouchableOpacity style={[s.actionBtn, { marginTop: 10 }]} onPress={() => markStatus('sent')} disabled={saving}>
             {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Sent</Text>}
@@ -468,6 +552,24 @@ export function InvoiceScreen({ route, navigation }: any) {
         remaining={remaining}
         onClose={() => setShowRecordPayment(false)}
         onSave={handleRecordPayment}
+      />
+
+      <CommReviewModal
+        visible={showComm}
+        intent={commIntent}
+        vars={{
+          customer_name: invoice.customer.name,
+          address: invoice.customer.address,
+          invoice_number: invoice.invoiceNumber,
+          invoice_total: `$${fmt(total)}`,
+          payment_terms: invoice.paymentTerms,
+          balance_due: remaining > 0 ? `$${fmt(remaining)}` : undefined,
+        }}
+        recipientEmail={invoice.customer.email}
+        attachments={pdfUri ? [pdfUri] : undefined}
+        attachmentLabel={pdfUri ? `Invoice ${invoice.invoiceNumber} PDF` : undefined}
+        onClose={() => { setShowComm(false); setPdfUri(null); }}
+        onSent={handleCommSent}
       />
     </SafeAreaView>
   );
