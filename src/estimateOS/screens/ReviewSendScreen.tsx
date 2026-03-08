@@ -32,6 +32,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
+  // Phase 1: load estimate + template — clears loading immediately so screen renders
   useEffect(() => {
     if (!estimateId) return;
     (async () => {
@@ -56,27 +57,33 @@ export function ReviewSendScreen({ route, navigation }: any) {
           if (est.customer.email) setRecipients(est.customer.email);
           setSubject(fillTemplate(settings.emailTemplate.subject, vars));
           setBody(fillTemplate(settings.emailTemplate.body, vars));
-
-          // Generate PDF in background
-          if (isPdfAvailable()) {
-            setGeneratingPdf(true);
-            try {
-              const result = await generateEstimatePdf(est, settings.businessProfile);
-              if (result.ok) {
-                setPdfUri(result.fileUri);
-              } else {
-                setPdfError(result.error);
-              }
-            } catch (e: any) {
-              setPdfError(e?.message ?? 'Could not generate PDF');
-            } finally {
-              setGeneratingPdf(false);
-            }
-          }
         }
       } finally { setLoading(false); }
     })();
   }, [estimateId]);
+
+  // Phase 2: generate PDF after screen is visible (doesn't block the loading spinner)
+  useEffect(() => {
+    if (!estimate) return;
+    if (!isPdfAvailable()) return;
+    let cancelled = false;
+    (async () => {
+      setGeneratingPdf(true);
+      try {
+        const settings = await getSettings();
+        if (cancelled) return;
+        const result = await generateEstimatePdf(estimate, settings.businessProfile);
+        if (cancelled) return;
+        if (result.ok) { setPdfUri(result.fileUri); }
+        else { setPdfError(result.error); }
+      } catch (e: any) {
+        if (!cancelled) setPdfError(e?.message ?? 'Could not generate PDF');
+      } finally {
+        if (!cancelled) setGeneratingPdf(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [estimate?.id]); // re-run only if the estimate changes, not on every render
 
   if (loading) return <SafeAreaView style={s.safe}><ActivityIndicator style={{ marginTop: 60 }} color={T.accent} /></SafeAreaView>;
   if (!estimate) return <SafeAreaView style={s.safe}><Text style={s.notFound}>Estimate not found.</Text></SafeAreaView>;
@@ -122,26 +129,28 @@ export function ReviewSendScreen({ route, navigation }: any) {
   };
 
   const handleShare = async () => {
-    // Save template
-    await saveEmailTemplate(subject, body);
-
-    await sendUnified({
-      intent: 'estimate_send',
-      action: 'share',
-      subject,
-      body,
-      attachments: pdfUri ? [pdfUri] : undefined,
-    });
-
-    // Log timeline event
-    if (estimate.customerId) {
-      await TimelineRepository.appendEvent({
-        customerId: estimate.customerId,
-        estimateId: estimate.id,
-        type: 'estimate_sent',
-        note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+    if (sending) return;
+    setSending(true);
+    try {
+      await saveEmailTemplate(subject, body);
+      const result = await sendUnified({
+        intent: 'estimate_send',
+        action: 'share',
+        subject,
+        body,
+        attachments: pdfUri ? [pdfUri] : undefined,
       });
-    }
+      if (result.status === 'success' && estimate.customerId) {
+        await TimelineRepository.appendEvent({
+          customerId: estimate.customerId,
+          estimateId: estimate.id,
+          type: 'estimate_sent',
+          note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+        });
+      }
+    } catch (e: any) {
+      Alert.alert('Share Failed', e?.message ?? 'Could not open share sheet.');
+    } finally { setSending(false); }
   };
 
   const { computedRange: range } = estimate;
@@ -231,7 +240,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={s.shareSecondaryBtn} onPress={handleShare} disabled={sending}>
+          <TouchableOpacity style={[s.shareSecondaryBtn, sending && { opacity: 0.5 }]} onPress={handleShare} disabled={sending}>
             <Text style={s.shareSecondaryTxt}>{pdfUri ? '📄 Share PDF' : '📤 Share via Share Sheet'}</Text>
           </TouchableOpacity>
 

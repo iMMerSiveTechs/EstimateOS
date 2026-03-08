@@ -96,7 +96,8 @@ function esc(s: string | undefined | null): string {
 }
 
 function fmtMoney(n: number): string {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const safe = isNaN(n) || !isFinite(n) ? 0 : n;
+  return safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDate(iso: string | undefined | null): string {
@@ -124,6 +125,7 @@ const SHARED_CSS = `
   .biz-detail { font-size: 11px; color: #475569; line-height: 1.6; }
   .doc-type { font-size: 26px; font-weight: 800; color: #1e3a5f; letter-spacing: 1px; text-transform: uppercase; }
   .doc-number { font-size: 13px; color: #475569; margin-top: 4px; }
+  .doc-ref { font-size: 11px; color: #94a3b8; margin-top: 2px; font-style: italic; }
   .doc-date { font-size: 11px; color: #64748b; margin-top: 2px; }
   .status-badge {
     display: inline-block; padding: 3px 10px; border-radius: 4px;
@@ -395,9 +397,16 @@ function buildInvoiceHtml(invoice: Invoice, profile: BusinessProfile): string {
         <span class="totals-label" style="color:#16a34a;">Amount Paid</span>
         <span class="totals-value" style="color:#16a34a;">-$${fmtMoney(amountPaid)}</span>
       </div>
-      <div class="totals-row" style="font-weight:700;font-size:14px;">
-        <span style="color:${invoice.status === 'overdue' ? '#dc2626' : '#0f172a'};">Balance Due</span>
-        <span style="color:${invoice.status === 'overdue' ? '#dc2626' : '#0f172a'};">$${fmtMoney(remaining)}</span>
+    `;
+  }
+  // Always show Balance Due for unpaid/partial invoices so customer has a clear amount to pay
+  const isSettled = invoice.status === 'paid' || invoice.status === 'void';
+  if (!isSettled && remaining > 0) {
+    const dueColor = invoice.status === 'overdue' ? '#dc2626' : '#0f172a';
+    totalsHtml += `
+      <div class="totals-row" style="font-weight:700;font-size:14px;border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;">
+        <span style="color:${dueColor};">Balance Due</span>
+        <span style="color:${dueColor};">$${fmtMoney(remaining)}</span>
       </div>
     `;
   }
@@ -457,6 +466,7 @@ function buildInvoiceHtml(invoice: Invoice, profile: BusinessProfile): string {
       <div class="header-right">
         <div class="doc-type">Invoice</div>
         <div class="doc-number">${esc(invoice.invoiceNumber)}</div>
+        ${invoice.estimateNumber ? `<div class="doc-ref">Ref: ${esc(invoice.estimateNumber)}</div>` : ''}
         ${dateLines}
         ${statusHtml}
       </div>

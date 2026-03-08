@@ -12,7 +12,7 @@
  * stub internals without changing screens or CommReviewModal.
  */
 
-import { Share, Platform, Clipboard } from 'react-native';
+import { Share, Platform } from 'react-native';
 import { CommIntent } from '../models/types';
 import { ServiceResult, ok, stubMode, providerError } from './ServiceResult';
 
@@ -91,10 +91,28 @@ export async function sendUnified(
 
   if (action === 'copy') {
     const full = subject ? `${subject}\n\n${body}` : body;
-    Clipboard.setString(full);
+    // Clipboard was removed from react-native core in 0.73+.
+    // Try @react-native-community/clipboard first, fall back to legacy rn export.
+    let copied = false;
+    try {
+      const cb = require('@react-native-community/clipboard').default;
+      cb.setString(full);
+      copied = true;
+    } catch {}
+    if (!copied) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Clipboard: RNClipboard } = require('react-native');
+        if (RNClipboard?.setString) { RNClipboard.setString(full); copied = true; }
+      } catch {}
+    }
+    if (!copied) {
+      // Last-resort: share the text so user can copy from the share sheet
+      try { await Share.share({ message: full }); } catch {}
+    }
     return ok(
-      { action: 'copy', delivered: true, message: 'Copied to clipboard.' },
-      'Message copied to clipboard.',
+      { action: 'copy', delivered: true, message: copied ? 'Copied to clipboard.' : 'Text shared — copy from the share sheet.' },
+      copied ? 'Message copied to clipboard.' : 'Text shared.',
     );
   }
 
@@ -253,10 +271,6 @@ async function sendSms(
   body: string,
 ): Promise<ServiceResult<SendResult>> {
   try {
-    const smsUrl = Platform.OS === 'ios'
-      ? `sms:${to}&body=${encodeURIComponent(body)}`
-      : `sms:${to}?body=${encodeURIComponent(body)}`;
-
     await Share.share({ message: body, title: 'Send SMS' });
     return ok({ channel: 'sms', delivered: true }, 'Opened messaging app.');
   } catch {

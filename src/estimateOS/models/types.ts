@@ -341,6 +341,7 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;          // e.g. "INV-0012"
   estimateId?: string;
+  estimateNumber?: string;        // snapshot of estimate number at invoice creation
   customerId?: string;
   customer: {
     name: string;
