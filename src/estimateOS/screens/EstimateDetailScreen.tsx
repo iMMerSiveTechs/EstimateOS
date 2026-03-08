@@ -16,7 +16,7 @@ import { MaterialsSection } from '../components/MaterialsSection';
 import { FollowUpPanel } from '../components/FollowUpPanel';
 import { ReminderSheet } from '../components/ReminderSheet';
 import { CommReviewModal } from '../components/CommReviewModal';
-import { generateEstimatePdf, sharePdf, isPdfAvailable } from '../services/pdfService';
+import { generateEstimatePdf, sharePdf } from '../services/pdfService';
 import { intentToTimelineEvent } from '../services/commProvider';
 import { T, radii } from '../theme';
 
@@ -101,6 +101,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
   const [commIntent, setCommIntent] = useState<CommIntent>('follow_up');
   const [pdfUri, setPdfUri] = useState<string | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [expandedDrivers, setExpandedDrivers] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     if (!estimateId) return;
@@ -138,21 +139,29 @@ export function EstimateDetailScreen({ route, navigation }: any) {
     setSaving(true);
     try {
       const num = await nextInvoiceNumber();
+      const driverItems = estimate.drivers
+        .filter(d => !d.disabled)
+        .map(d => ({
+          id: d.id,
+          label: d.label,
+          unitCost: Math.round(((d.overrideMin ?? d.minImpact) + (d.overrideMax ?? d.maxImpact)) / 2),
+          quantity: 1,
+        }));
+      const materialItems = (estimate.materialLineItems ?? []).map(m => ({
+        id: m.id,
+        label: m.name,
+        unitCost: m.unitCost,
+        quantity: m.quantity,
+      }));
       const inv: Invoice = {
         id: makeId(),
         invoiceNumber: num,
         estimateId: estimate.id,
+        estimateNumber: estimate.estimateNumber,
         customerId: estimate.customerId,
         customer: estimate.customer,
         status: 'draft',
-        lineItems: estimate.drivers
-          .filter(d => !d.disabled)
-          .map(d => ({
-            id: d.id,
-            label: d.label,
-            unitCost: Math.round(((d.overrideMin ?? d.minImpact) + (d.overrideMax ?? d.maxImpact)) / 2),
-            quantity: 1,
-          })),
+        lineItems: [...driverItems, ...materialItems],
         taxRate: 0,
         paymentTerms: 'Due on receipt',
         createdAt: new Date().toISOString(),
@@ -347,14 +356,33 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         {estimate.drivers.length > 0 && (
           <>
             <SectionHeader title={`Line Items (${estimate.drivers.filter(d => !d.disabled).length})`} />
-            {estimate.drivers.filter(d => !d.disabled).map(d => (
-              <View key={d.id} style={s.driverRow}>
-                <Text style={s.driverLabel} numberOfLines={1}>{d.label}</Text>
-                <Text style={s.driverAmt}>
-                  ${(d.overrideMin ?? d.minImpact).toLocaleString('en-US')}–${(d.overrideMax ?? d.maxImpact).toLocaleString('en-US')}
-                </Text>
-              </View>
-            ))}
+            {estimate.drivers.filter(d => !d.disabled).map(d => {
+              const isExpanded = !!expandedDrivers[d.id];
+              const hasExplanation = !!d.explanation;
+              return (
+                <TouchableOpacity
+                  key={d.id}
+                  style={s.driverRow}
+                  onPress={() => hasExplanation && setExpandedDrivers(prev => ({ ...prev, [d.id]: !prev[d.id] }))}
+                  activeOpacity={hasExplanation ? 0.7 : 1}
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={s.driverLabel}>{d.label}</Text>
+                    {isExpanded && hasExplanation && (
+                      <Text style={s.driverExplanation}>{d.explanation}</Text>
+                    )}
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={s.driverAmt}>
+                      ${(d.overrideMin ?? d.minImpact).toLocaleString('en-US')}–${(d.overrideMax ?? d.maxImpact).toLocaleString('en-US')}
+                    </Text>
+                    {hasExplanation && (
+                      <Text style={s.driverChevron}>{isExpanded ? '▲' : '▼'}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </>
         )}
 
@@ -428,7 +456,12 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           </TouchableOpacity>
           <TouchableOpacity style={s.actionBtn} onPress={handleSendEstimate} disabled={generatingPdf}>
             {generatingPdf ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>📤</Text>}
-            <Text style={s.actionTxt}>Send Estimate</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.actionTxt}>Send Estimate</Text>
+              {!estimate.customer.email && (
+                <Text style={s.actionHint}>No email on file — you can enter one when sending</Text>
+              )}
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={s.actionBtn} onPress={handleExportPdf} disabled={generatingPdf}>
             {generatingPdf ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>📄</Text>}
@@ -496,9 +529,11 @@ const s = StyleSheet.create({
   statusBtn: { borderWidth: 1, borderColor: T.border, borderRadius: radii.md, paddingHorizontal: 14, paddingVertical: 8 },
   statusBtnTxt: { color: T.sub, fontSize: 13, fontWeight: '600' },
 
-  driverRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
-  driverLabel: { color: T.textDim, fontSize: 14, flex: 1, marginRight: 10 },
+  driverRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
+  driverLabel: { color: T.textDim, fontSize: 14 },
+  driverExplanation: { color: T.sub, fontSize: 12, lineHeight: 17, marginTop: 4 },
   driverAmt: { color: T.text, fontSize: 13, fontWeight: '600' },
+  driverChevron: { color: T.muted, fontSize: 9, marginTop: 4 },
 
   invoiceRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: radii.md, padding: 14, borderWidth: 1, borderColor: T.border, marginBottom: 8 },
   invoiceNum: { color: T.text, fontSize: 15, fontWeight: '600' },
@@ -515,6 +550,7 @@ const s = StyleSheet.create({
   actionBtnDanger: { borderColor: T.redLo },
   actionIcon: { fontSize: 20 },
   actionTxt: { color: T.text, fontSize: 15, fontWeight: '600' },
+  actionHint: { color: T.muted, fontSize: 11, marginTop: 2 },
   commRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   commBtn: { flex: 1, backgroundColor: T.surface, borderRadius: radii.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: T.border },
   commBtnTxt: { color: T.text, fontSize: 13, fontWeight: '600' },

@@ -370,6 +370,7 @@ export function InvoiceScreen({ route, navigation }: any) {
           {invoice.sentAt && <Text style={s.invDate}>Sent: {new Date(invoice.sentAt).toLocaleDateString()}</Text>}
           {invoice.paidAt && <Text style={s.invDate}>Paid: {new Date(invoice.paidAt).toLocaleDateString()}</Text>}
           {invoice.voidedAt && <Text style={[s.invDate, { color: T.red }]}>Voided: {new Date(invoice.voidedAt).toLocaleDateString()}{invoice.voidReason ? ` — ${invoice.voidReason}` : ''}</Text>}
+          {invoice.estimateNumber && <Text style={s.invEstRef}>Ref: {invoice.estimateNumber}</Text>}
         </View>
 
         {/* Payment balance tracker (if any payments recorded or partially paid) */}
@@ -585,6 +586,7 @@ const s = StyleSheet.create({
   customerName: { color: T.text, fontSize: 20, fontWeight: '700' },
   customerSub: { color: T.sub, fontSize: 13, marginTop: 2 },
   invDate: { color: T.muted, fontSize: 12, marginTop: 3 },
+  invEstRef: { color: T.muted, fontSize: 12, marginTop: 3, fontStyle: 'italic' },
   // Balance tracker
   balanceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, marginTop: 12, gap: 8 },
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
