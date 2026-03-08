@@ -19,7 +19,8 @@
         "NSPhotoLibraryUsageDescription": "EstimateOS accesses your photo library to attach site photos to estimates.",
         "NSMicrophoneUsageDescription": "EstimateOS uses the microphone for video recording.",
         "NSPhotoLibraryAddUsageDescription": "EstimateOS saves site photos to your photo library.",
-        "NSUserNotificationsUsageDescription": "EstimateOS sends reminder notifications for follow-ups, appointments, and invoice reminders."
+        "NSUserNotificationsUsageDescription": "EstimateOS sends reminder notifications for follow-ups, appointments, and invoice reminders.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
