@@ -17,7 +17,6 @@
       }
     },
     "production": {
-      "autoIncrement": true,
       "cache": {
         "disabled": true
       }

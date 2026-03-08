@@ -17,11 +17,12 @@ import {
   signOut as firebaseSignOut,
   UserCredential,
 } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { auth, firebaseConfigured } from '../firebase/config';
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  firebaseAvailable: boolean;
   signIn: (email: string, password: string) => Promise<UserCredential>;
   signUp: (email: string, password: string) => Promise<UserCredential>;
   signOut: () => Promise<void>;
@@ -34,6 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) {
+      // Firebase not configured — boot into unauthenticated state so the
+      // app renders rather than hanging on the loading gate.
+      setLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -41,16 +48,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const signIn = (email: string, password: string) =>
-    signInWithEmailAndPassword(auth, email, password);
+  const signIn = (email: string, password: string) => {
+    if (!auth) return Promise.reject(new Error('Firebase not configured'));
+    return signInWithEmailAndPassword(auth, email, password);
+  };
 
-  const signUp = (email: string, password: string) =>
-    createUserWithEmailAndPassword(auth, email, password);
+  const signUp = (email: string, password: string) => {
+    if (!auth) return Promise.reject(new Error('Firebase not configured'));
+    return createUserWithEmailAndPassword(auth, email, password);
+  };
 
-  const signOut = () => firebaseSignOut(auth);
+  const signOut = () => {
+    if (!auth) return Promise.resolve();
+    return firebaseSignOut(auth);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, firebaseAvailable: firebaseConfigured, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
