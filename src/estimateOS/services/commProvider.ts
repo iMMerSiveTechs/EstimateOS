@@ -12,7 +12,7 @@
  * stub internals without changing screens or CommReviewModal.
  */
 
-import { Share, Platform } from 'react-native';
+import { Share, Platform, Alert } from 'react-native';
 import { CommIntent } from '../models/types';
 import { ServiceResult, ok, stubMode, providerError } from './ServiceResult';
 
@@ -153,7 +153,39 @@ async function sendEmailUnified(
       );
     }
 
-    // Fallback: native share sheet
+    // MailComposer unavailable — use the best fallback we can.
+    if (attachments && attachments.length > 0) {
+      // Try expo-sharing for the PDF file first (preserves attachment).
+      let Sharing: any = null;
+      try { Sharing = require('expo-sharing'); } catch {}
+      if (Sharing && (await Sharing.isAvailableAsync())) {
+        await Sharing.shareAsync(attachments[0], {
+          mimeType: 'application/pdf',
+          dialogTitle: subject,
+          UTI: 'com.adobe.pdf',
+        });
+        Alert.alert(
+          'Email not available',
+          'Mail is not set up on this device. The PDF was shared via the share sheet instead.',
+        );
+        return ok(
+          { action: 'email', delivered: true, message: 'Email not available — PDF shared via share sheet.' },
+          'PDF shared via share sheet (email not available).',
+        );
+      }
+      // expo-sharing also unavailable — text only, PDF lost.
+      await Share.share({ title: subject, message: body });
+      Alert.alert(
+        'Attachment not sent',
+        'Mail and file sharing are not available on this device. The message was shared as text — the PDF attachment was not included.',
+      );
+      return ok(
+        { action: 'email', delivered: true, message: 'Email not available — message shared as text without PDF.' },
+        'Message shared as text (PDF attachment could not be included).',
+      );
+    }
+
+    // No attachments — plain text share is fine.
     await Share.share({ title: subject, message: body });
     return ok(
       { action: 'email', delivered: true, message: 'Shared via share sheet (mail not available).' },

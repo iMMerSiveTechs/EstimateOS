@@ -182,12 +182,13 @@ export function InvoiceScreen({ route, navigation }: any) {
   const isVoided = invoice.status === 'void';
   const canReceivePayment = invoice.status === 'sent' || invoice.status === 'partially_paid' || invoice.status === 'overdue';
 
-  const subtotal  = invoice.lineItems.reduce((sum, li) => sum + li.unitCost * li.quantity, 0);
-  const taxRate   = Math.min(1, Math.max(0, Number(taxInput) / 100 || 0));
-  const taxAmt    = subtotal * taxRate;
-  const total     = subtotal + taxAmt;
-  const amountPaid = invoice.amountPaid ?? 0;
-  const remaining  = Math.max(0, total - amountPaid);
+  const subtotal    = invoice.lineItems.reduce((sum, li) => sum + li.unitCost * li.quantity, 0);
+  const taxRate     = Math.min(1, Math.max(0, Number(taxInput) / 100 || 0));
+  const taxAmt      = subtotal * taxRate;
+  const discountAmt = invoice.discountAmount ?? 0;
+  const total       = subtotal + taxAmt - discountAmt;
+  const amountPaid  = invoice.amountPaid ?? 0;
+  const remaining   = Math.max(0, total - amountPaid);
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -344,6 +345,7 @@ export function InvoiceScreen({ route, navigation }: any) {
       lines,
       '',
       `Subtotal: $${fmt(subtotal)}`,
+      discountAmt > 0 ? `Discount: -$${fmt(discountAmt)}` : null,
       taxRate > 0 ? `Tax (${Math.round(taxRate * 100)}%): $${fmt(taxAmt)}` : null,
       `TOTAL: $${fmt(total)}`,
       amountPaid > 0 ? `Paid: $${fmt(amountPaid)}` : null,
@@ -453,6 +455,7 @@ export function InvoiceScreen({ route, navigation }: any) {
         {/* Totals */}
         <View style={s.totalsCard}>
           <View style={s.totalRow}><Text style={s.totalLabel}>Subtotal</Text><Text style={s.totalAmt}>${fmt(subtotal)}</Text></View>
+          {discountAmt > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Discount</Text><Text style={s.totalAmt}>–${fmt(discountAmt)}</Text></View>}
           {taxRate > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Tax ({Math.round(taxRate * 100)}%)</Text><Text style={s.totalAmt}>${fmt(taxAmt)}</Text></View>}
           <View style={[s.totalRow, s.totalRowFinal]}><Text style={s.totalFinalLabel}>Total</Text><Text style={s.totalFinalAmt}>${fmt(total)}</Text></View>
         </View>
