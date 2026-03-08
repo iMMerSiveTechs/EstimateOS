@@ -1,6 +1,11 @@
 name: EAS Build
 
 on:
+  # Auto-trigger on every push to claude/ branches (AI-authored changes)
+  push:
+    branches:
+      - 'claude/**'
+  # Manual trigger for other branches/profiles
   workflow_dispatch:
     inputs:
       platform:
@@ -23,8 +28,37 @@ on:
           - development
 
 jobs:
-  build:
+  # ── Auto build + submit on push to claude/* branches ─────────────────────────
+  build-auto:
+    name: EAS Build iOS (auto)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build and submit iOS to TestFlight
+        run: eas build --platform ios --profile production --auto-submit --non-interactive
+
+  # ── Manual trigger (unchanged behaviour) ─────────────────────────────────────
+  build-manual:
     name: EAS Build (${{ github.event.inputs.platform }})
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
