@@ -5,6 +5,20 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { AppSettings, BusinessProfile, QualityPreset } from '../models/types';
 
+// Firebase v11 rejects undefined values at any nesting level — strip before write.
+function deepStripUndefined(obj: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v._methodName === 'undefined') {
+      out[k] = deepStripUndefined(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 function uid(): string {
   const user = auth.currentUser;
   if (!user) throw new Error('settings: user is not signed in');
@@ -78,7 +92,7 @@ export async function getSettings(): Promise<AppSettings> {
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
-  await setDoc(settingsRef(), { ...settings, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(settingsRef(), { ...deepStripUndefined(settings), updatedAt: serverTimestamp() }, { merge: true });
 }
 
 export async function getBusinessProfile(): Promise<BusinessProfile> {

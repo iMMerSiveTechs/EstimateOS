@@ -304,6 +304,8 @@ export function NewEstimateScreen({ route, navigation }: any) {
       const displayName = estimate.customer.name;
       showToast(`Draft saved${displayName !== 'Untitled Draft' ? ` for ${displayName}` : ''} ✓`);
       // Do NOT navigate — stay on screen
+    } catch (err: any) {
+      showToast(`Save failed: ${err?.message ?? 'unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -338,6 +340,8 @@ export function NewEstimateScreen({ route, navigation }: any) {
       editingIdRef.current = estimate.id;
       await EstimateRepository.upsertEstimate(estimate);
       navigation.navigate('EstimateDetail', { estimateId: estimate.id });
+    } catch (err: any) {
+      showToast(`Save failed: ${err?.message ?? 'unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -490,7 +494,7 @@ export function NewEstimateScreen({ route, navigation }: any) {
             onPress={handleSaveDraft}
             disabled={saving}
           >
-            <Text style={styles.btnGhostText}>Save Draft</Text>
+            <Text style={styles.btnGhostText}>{saving ? 'Saving…' : 'Save Draft'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.btn, saving && styles.btnDisabled]}

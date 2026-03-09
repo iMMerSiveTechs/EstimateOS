@@ -85,27 +85,36 @@ export function OperationsDashboardScreen({ navigation }: any) {
     // remains visible while the update runs in the background.
     if (isFirstLoad.current) setLoading(true);
     try {
-      const [ests, invs, custs, rems, intakes, settings, onboarding] = await Promise.all([
+      // Core business data — these must succeed for the dashboard to be useful.
+      const [ests, invs, custs, rems, intakes] = await Promise.all([
         EstimateRepository.listEstimates(),
         InvoiceRepository.listInvoices(),
         CustomerRepository.listCustomers(),
         ReminderRepository.listPending(),
         IntakeDraftRepository.listByStatus('new'),
-        getSettings(),
-        getOnboardingData(),
       ]);
       setEstimates(ests);
       setInvoices(invs);
       setCustomers(custs);
       setReminders(rems);
       setDrafts(intakes);
-      // Use Firestore settings as primary source; fall back to onboarding
-      // AsyncStorage data so the profile item shows as complete immediately
-      // after onboarding even if the Firestore write is still propagating.
-      setHasProfile(
-        !!settings.businessProfile.businessName?.trim() ||
-        !!onboarding?.companyName?.trim()
-      );
+
+      // Profile check — read settings + onboarding independently so a Firestore
+      // or AsyncStorage failure does not wipe out the rest of the dashboard data.
+      try {
+        const [settings, onboarding] = await Promise.all([getSettings(), getOnboardingData()]);
+        setHasProfile(
+          !!settings.businessProfile.businessName?.trim() ||
+          !!onboarding?.companyName?.trim()
+        );
+      } catch {
+        // Non-fatal: profile completeness check fails gracefully.
+        // Try AsyncStorage alone as a last resort.
+        try {
+          const onboarding = await getOnboardingData();
+          if (onboarding?.companyName?.trim()) setHasProfile(true);
+        } catch { /* ignore */ }
+      }
     } finally {
       isFirstLoad.current = false;
       setLoading(false);

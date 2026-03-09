@@ -9,7 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ALL_VERTICALS } from '../config/verticals';
 import { VerticalConfig, PricingRule, QualityPreset, PricingDefaults } from '../models/types';
 import { loadCustomVerticals, mergeVerticals } from '../storage/customVerticals';
-import { getSettings, saveSettings } from '../storage/settings';
+import { getSettings, saveSettings, DEFAULT_SETTINGS } from '../storage/settings';
 import { RuleBuilderModal } from '../components/RuleBuilderModal';
 import { T, radii } from '../theme';
 
@@ -215,6 +215,8 @@ function PresetsTab({ presets, onChange, saving }: {
   presets: QualityPreset[]; onChange: (p: QualityPreset[]) => void; saving: boolean;
 }) {
   const [local, setLocal] = useState<QualityPreset[]>(presets);
+  // Sync when parent loads data after mount (e.g. Firestore read completes).
+  React.useEffect(() => { if (presets.length > 0) setLocal(presets); }, [presets]);
 
   const update = (idx: number, patch: Partial<QualityPreset>) => {
     const next = [...local];
@@ -295,10 +297,16 @@ export function PricingRulesScreen() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const [custom, settings] = await Promise.all([loadCustomVerticals(), (async () => (await import('../storage/settings')).getSettings())()]);
-    setVerticals(mergeVerticals(ALL_VERTICALS, custom));
-    setPricingDefaults(settings.pricingDefaults);
-    setPresets(settings.presets);
+    try {
+      const [custom, settings] = await Promise.all([loadCustomVerticals(), (async () => (await import('../storage/settings')).getSettings())()]);
+      setVerticals(mergeVerticals(ALL_VERTICALS, custom));
+      setPricingDefaults(settings.pricingDefaults);
+      setPresets(settings.presets ?? DEFAULT_SETTINGS.presets);
+    } catch {
+      // Fall back to built-in defaults so tabs render instead of spinning forever.
+      setPricingDefaults(prev => prev ?? DEFAULT_SETTINGS.pricingDefaults);
+      setPresets(prev => prev.length > 0 ? prev : DEFAULT_SETTINGS.presets);
+    }
   }, []);
 
   useFocusEffect(load);

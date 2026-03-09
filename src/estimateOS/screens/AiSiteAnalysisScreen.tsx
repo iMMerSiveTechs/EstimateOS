@@ -678,7 +678,7 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
     setMapsGrounding(shouldUseMapGrounding(t));
   };
 
-  // Phase 0: show DemoModal, no credit deduction, no history write
+  // Phase 0: run local simulation, no credit deduction, no history write.
   // Guard checks run even in demo mode so the UI is consistent for Phase 2+.
   const runAnalysis = (useLastJobs = false) => {
     const currentJobs = useLastJobs ? lastJobsRef.current : getJobs();
@@ -707,7 +707,27 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
 
     setFailureMessage(null);
     lastJobsRef.current = currentJobs;
-    setShowDemoModal(true);
+
+    // Build simulated result immediately and show ResultModal.
+    // This makes the demo feel real — all the UI infrastructure (confidence bars,
+    // evidence cards, Apply to Estimate button) is already production-ready.
+    setAnalyzing(true);
+    setAnalysisPhase(ANALYSIS_PHASES[0]);
+
+    // Cycle through phases for realistic UX feel, then show results.
+    let phaseIdx = 0;
+    const phaseInterval = setInterval(() => {
+      phaseIdx += 1;
+      if (phaseIdx < ANALYSIS_PHASES.length) {
+        setAnalysisPhase(ANALYSIS_PHASES[phaseIdx]);
+      } else {
+        clearInterval(phaseInterval);
+        const simResult = buildSimulatedResult(currentJobs, focusPrompt, vertical);
+        setResult(simResult);
+        setAnalyzing(false);
+        setShowResult(true);
+      }
+    }, 420);
   };
 
   const retryAnalysis = () => {
@@ -746,7 +766,14 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
       }
     }
 
-    await EstimateRepository.upsertEstimate({ ...estimate, intakeAnswers: merged, updatedAt: new Date().toISOString() });
+    // Persist processed local photo URIs so EstimateDetailScreen can show a count.
+    const photoUris = lastJobsRef.current
+      .filter(j => j.kind === 'photo' && (j.outputUri ?? j.uri))
+      .map(j => j.outputUri ?? j.uri!);
+    const existingPhotos = estimate.photos ?? [];
+    const allPhotos = [...existingPhotos, ...photoUris.filter(u => !existingPhotos.includes(u))];
+
+    await EstimateRepository.upsertEstimate({ ...estimate, intakeAnswers: merged, photos: allPhotos, updatedAt: new Date().toISOString() });
 
     const histRecord: AiScanRecord = {
       id: makeId(), estimateId, createdAt: record.createdAt, summary: record.summary,

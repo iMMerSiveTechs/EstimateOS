@@ -31,8 +31,10 @@ export function CustomerDetailScreen({ route, navigation }: any) {
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
   const [showReminder, setShowReminder] = useState(false);
   const [showComm, setShowComm] = useState(false);
 
@@ -51,16 +53,18 @@ export function CustomerDetailScreen({ route, navigation }: any) {
   const load = useCallback(async () => {
     if (!customerId) return;
     setLoading(true);
+    setLoadError(false);
     try {
-      const [c, allEsts, invs] = await Promise.all([
+      const [c, ests, invs] = await Promise.all([
         CustomerRepository.getCustomer(customerId),
-        EstimateRepository.listEstimates(),
+        EstimateRepository.listByCustomer(customerId),
         InvoiceRepository.listByCustomer(customerId),
       ]);
       setCustomer(c);
-      setEstimates(allEsts.filter(e => e.customerId === customerId));
+      setEstimates(ests);
       setInvoices(invs);
-    } finally { setLoading(false); }
+    } catch { setLoadError(true); }
+    finally { setLoading(false); }
   }, [customerId]);
 
   useFocusEffect(load);
@@ -84,6 +88,7 @@ export function CustomerDetailScreen({ route, navigation }: any) {
     if (!name.trim()) { setNameErr('Name is required'); return; }
     if (!customer) return;
     setSaving(true);
+    setSaveErr('');
     try {
       const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
       const updated: Customer = {
@@ -102,6 +107,8 @@ export function CustomerDetailScreen({ route, navigation }: any) {
       await CustomerRepository.upsertCustomer(updated);
       setCustomer(updated);
       setEditing(false);
+    } catch (e: any) {
+      setSaveErr(e?.message ?? 'Save failed. Please try again.');
     } finally { setSaving(false); }
   };
 
@@ -109,13 +116,28 @@ export function CustomerDetailScreen({ route, navigation }: any) {
     Alert.alert('Delete Customer', 'This will not delete linked estimates or invoices.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        await CustomerRepository.deleteCustomer(customerId);
-        navigation.goBack();
+        try {
+          await CustomerRepository.deleteCustomer(customerId);
+          navigation.goBack();
+        } catch (e: any) {
+          Alert.alert('Delete failed', e?.message ?? 'Please try again.');
+        }
       }},
     ]);
   };
 
   if (loading) return <SafeAreaView style={s.safe}><ActivityIndicator style={{ marginTop: 60 }} color={T.accent} /></SafeAreaView>;
+  if (loadError) return (
+    <SafeAreaView style={s.safe}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <Text style={{ color: T.text, fontSize: 16, fontWeight: '600' }}>Couldn't load customer</Text>
+        <Text style={{ color: T.sub, fontSize: 14 }}>Check your connection and tap to retry</Text>
+        <TouchableOpacity onPress={load} style={{ backgroundColor: T.accent, borderRadius: radii.md, paddingHorizontal: 24, paddingVertical: 12 }}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
   if (!customer) return <SafeAreaView style={s.safe}><Text style={s.notFound}>Customer not found.</Text></SafeAreaView>;
 
   // ── Edit form ─────────────────────────────────────────────────────────────
@@ -170,6 +192,7 @@ export function CustomerDetailScreen({ route, navigation }: any) {
 
           <Text style={s.label}>Notes</Text>
           <TextInput style={[s.input, s.inputMulti]} value={notes} onChangeText={setNotes} placeholder="Notes…" placeholderTextColor={T.muted} multiline numberOfLines={3} textAlignVertical="top" />
+          {!!saveErr && <Text style={s.saveErrTxt}>{saveErr}</Text>}
         </ScrollView>
       </SafeAreaView>
     );
@@ -380,6 +403,7 @@ const s = StyleSheet.create({
   input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 12, fontSize: 15 },
   inputMulti: { minHeight: 70, paddingTop: 10 },
   inputErr: { borderColor: T.red }, err: { color: T.red, fontSize: 12, marginTop: 4 },
+  saveErrTxt: { color: T.red, fontSize: 13, marginTop: 16, textAlign: 'center' },
   // Preferred contact chips
   contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   contactChip: { borderWidth: 1, borderColor: T.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: T.surface },
