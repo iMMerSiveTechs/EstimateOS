@@ -308,10 +308,6 @@ async function sendSms(
   } catch {
     return providerError('Could not open messaging app.');
   }
-
-  // TODO: When Twilio is connected:
-  //   1. Call backend to send SMS via Twilio
-  //   2. Return providerMessageId
 }
 
 // ─── Intent → timeline event mapping ────────────────────────────────────────

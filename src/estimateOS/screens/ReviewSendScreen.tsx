@@ -134,6 +134,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
   const handleShare = async () => {
     if (sending) return;
     setSending(true);
+    let navigateBack = false;
     try {
       await saveEmailTemplate(subject, body);
       const result = await sendUnified({
@@ -143,17 +144,21 @@ export function ReviewSendScreen({ route, navigation }: any) {
         body,
         attachments: pdfUri ? [pdfUri] : undefined,
       });
-      if (result.status === 'success' && estimate.customerId) {
-        await TimelineRepository.appendEvent({
-          customerId: estimate.customerId,
-          estimateId: estimate.id,
-          type: 'estimate_sent',
-          note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
-        });
+      if (result.status === 'success') {
+        if (estimate.customerId) {
+          await TimelineRepository.appendEvent({
+            customerId: estimate.customerId,
+            estimateId: estimate.id,
+            type: 'estimate_sent',
+            note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+          });
+        }
+        navigateBack = true;
       }
     } catch (e: any) {
       Alert.alert('Share Failed', e?.message ?? 'Could not open share sheet.');
     } finally { setSending(false); }
+    if (navigateBack) navigation.goBack();
   };
 
   const { computedRange: range } = estimate;

@@ -10,7 +10,7 @@ function deepStripUndefined(obj: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined) continue;
-    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v._methodName === 'undefined') {
+    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.toDate !== 'function' && typeof v._methodName === 'undefined') {
       out[k] = deepStripUndefined(v);
     } else {
       out[k] = v;
