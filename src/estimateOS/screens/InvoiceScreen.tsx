@@ -195,7 +195,11 @@ export function InvoiceScreen({ route, navigation }: any) {
   const save = async (patch: Partial<Invoice> = {}) => {
     const updated: Invoice = { ...invoice, ...patch, taxRate, paymentTerms: terms, notes: notes.trim() || undefined, updatedAt: new Date().toISOString() };
     setInvoice(updated);
-    await InvoiceRepository.upsertInvoice(updated);
+    try {
+      await InvoiceRepository.upsertInvoice(updated);
+    } catch {
+      Alert.alert('Save Failed', 'Could not save changes. Check your connection and try again.');
+    }
   };
 
   const markStatus = async (status: Invoice['status']) => {
@@ -212,7 +216,7 @@ export function InvoiceScreen({ route, navigation }: any) {
           customerId: invoice.customerId,
           invoiceId: invoice.id,
           estimateId: invoice.estimateId,
-          type: status === 'paid' ? 'status_changed' : 'quote_sent',
+          type: status === 'paid' ? 'status_changed' : 'invoice_sent',
           note: status === 'sent' ? `Invoice ${invoice.invoiceNumber} sent` : `Invoice ${invoice.invoiceNumber} marked paid`,
         });
       }
@@ -314,9 +318,9 @@ export function InvoiceScreen({ route, navigation }: any) {
   const handleCommSent = async () => {
     const eventType = intentToTimelineEvent(commIntent) as TimelineEventType;
     if (commIntent === 'invoice_send' && invoice.status === 'draft') {
+      // markStatus('sent') already logs the invoice_sent timeline event — don't double-log.
       await markStatus('sent');
-    }
-    if (invoice.customerId) {
+    } else if (invoice.customerId) {
       await TimelineRepository.appendEvent({
         customerId: invoice.customerId,
         invoiceId: invoice.id,
