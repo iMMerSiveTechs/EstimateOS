@@ -96,6 +96,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
     if (emails.length === 0) { setRecipientErr('Enter at least one valid email'); return; }
 
     setSending(true);
+    let navigateBack = false;
     try {
       // Save email template for next time
       await saveEmailTemplate(subject, body);
@@ -119,13 +120,15 @@ export function ReviewSendScreen({ route, navigation }: any) {
             note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
           });
         }
-        navigation.goBack();
+        navigateBack = true;
       } else {
         Alert.alert('Send Issue', result.message ?? 'Could not complete send.');
       }
     } catch (e: any) {
       Alert.alert('Send Failed', e?.message ?? 'Could not send estimate.');
     } finally { setSending(false); }
+    // Navigate after finally so setSending(false) runs on the mounted component.
+    if (navigateBack) navigation.goBack();
   };
 
   const handleShare = async () => {
