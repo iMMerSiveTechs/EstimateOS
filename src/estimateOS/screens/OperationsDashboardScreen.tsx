@@ -1,7 +1,7 @@
 // ─── OperationsDashboardScreen ────────────────────────────────────────────────
 // Phases 6, 7, 8: Ops overview, needs-attention, pipeline, ROI surfaces.
 // Natural Origins proving ground — lightweight, action-oriented, local-first.
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator,
@@ -15,6 +15,7 @@ import { ReminderRepository, IntakeDraftRepository } from '../storage/workflow';
 import { getSettings } from '../storage/settings';
 import { cancelScheduledNotification } from '../services/notificationService';
 import { GettingStartedChecklist, useGettingStartedDismissed, ChecklistContext } from '../components/GettingStartedChecklist';
+import { getOnboardingData } from './OnboardingScreen';
 import { T, radii } from '../theme';
 
 // ─── Color map for follow-up status (local — theme-based) ────────────────────
@@ -76,25 +77,37 @@ export function OperationsDashboardScreen({ navigation }: any) {
   const [drafts, setDrafts] = useState<IntakeDraft[]>([]);
   const [hasProfile, setHasProfile] = useState(false);
   const { dismissed: checklistDismissed, dismiss: dismissChecklist } = useGettingStartedDismissed();
+  const isFirstLoad = useRef(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Only show the full-screen spinner on the very first load.
+    // On subsequent focus returns, refresh silently so existing data
+    // remains visible while the update runs in the background.
+    if (isFirstLoad.current) setLoading(true);
     try {
-      const [ests, invs, custs, rems, intakes, settings] = await Promise.all([
+      const [ests, invs, custs, rems, intakes, settings, onboarding] = await Promise.all([
         EstimateRepository.listEstimates(),
         InvoiceRepository.listInvoices(),
         CustomerRepository.listCustomers(),
         ReminderRepository.listPending(),
         IntakeDraftRepository.listByStatus('new'),
         getSettings(),
+        getOnboardingData(),
       ]);
       setEstimates(ests);
       setInvoices(invs);
       setCustomers(custs);
       setReminders(rems);
       setDrafts(intakes);
-      setHasProfile(!!settings.businessProfile.businessName?.trim());
+      // Use Firestore settings as primary source; fall back to onboarding
+      // AsyncStorage data so the profile item shows as complete immediately
+      // after onboarding even if the Firestore write is still propagating.
+      setHasProfile(
+        !!settings.businessProfile.businessName?.trim() ||
+        !!onboarding?.companyName?.trim()
+      );
     } finally {
+      isFirstLoad.current = false;
       setLoading(false);
     }
   }, []);
