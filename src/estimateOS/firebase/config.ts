@@ -10,7 +10,8 @@
 // firebaseConfigured before using auth/db/storage/functions.
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { initializeAuth, getAuth, getReactNativePersistence, Auth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
@@ -41,8 +42,14 @@ let _storage:   FirebaseStorage   | null = null;
 let _functions: Functions         | null = null;
 
 try {
-  _app       = getApps().length ? getApp() : initializeApp(firebaseConfig as Record<string, string>);
-  _auth      = getAuth(_app);
+  const isNew = getApps().length === 0;
+  _app       = isNew ? initializeApp(firebaseConfig as Record<string, string>) : getApp();
+  // Use initializeAuth with device-level AsyncStorage persistence on first init.
+  // On subsequent inits (e.g. hot reload) fall back to getAuth() which returns
+  // the already-configured instance — calling initializeAuth twice would throw.
+  _auth      = isNew
+    ? initializeAuth(_app, { persistence: getReactNativePersistence(AsyncStorage) })
+    : getAuth(_app);
   _db        = getFirestore(_app);
   _storage   = getStorage(_app);
   _functions = getFunctions(_app);

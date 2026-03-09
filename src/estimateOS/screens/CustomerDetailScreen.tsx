@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  SafeAreaView, Alert, ActivityIndicator,
+  SafeAreaView, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -198,9 +198,21 @@ export function CustomerDetailScreen({ route, navigation }: any) {
             <View style={{ flex: 1 }}>
               <Text style={s.customerName}>{customer.name}</Text>
               {customer.companyName && <Text style={s.companyLine}>{customer.companyName}</Text>}
-              {customer.phone && <Text style={s.infoLine}>📞 {customer.phone}</Text>}
-              {customer.email && <Text style={s.infoLine}>✉️ {customer.email}</Text>}
-              {customer.address && <Text style={s.infoLine}>📍 {customer.address}</Text>}
+              {customer.phone && (
+                <TouchableOpacity onPress={() => Linking.openURL('tel:' + customer.phone)}>
+                  <Text style={[s.infoLine, s.infoLink]}>📞 {customer.phone}</Text>
+                </TouchableOpacity>
+              )}
+              {customer.email && (
+                <TouchableOpacity onPress={() => Linking.openURL('mailto:' + customer.email)}>
+                  <Text style={[s.infoLine, s.infoLink]}>✉️ {customer.email}</Text>
+                </TouchableOpacity>
+              )}
+              {customer.address && (
+                <TouchableOpacity onPress={() => Linking.openURL('maps:?q=' + encodeURIComponent(customer.address!))}>
+                  <Text style={[s.infoLine, s.infoLink]}>📍 {customer.address}</Text>
+                </TouchableOpacity>
+              )}
               {customer.billingAddress && customer.billingAddress !== customer.address && (
                 <Text style={s.infoLine}>🧾 Billing: {customer.billingAddress}</Text>
               )}
@@ -338,6 +350,7 @@ const s = StyleSheet.create({
   customerName: { color: T.text, fontSize: 20, fontWeight: '700', marginBottom: 2 },
   companyLine: { color: T.sub, fontSize: 13, marginBottom: 4 },
   infoLine: { color: T.sub, fontSize: 13, marginTop: 2 },
+  infoLink: { textDecorationLine: 'underline' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: T.border },
   tag: { backgroundColor: T.accentLo, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
   tagTxt: { color: T.accentHi, fontSize: 11, fontWeight: '600' },

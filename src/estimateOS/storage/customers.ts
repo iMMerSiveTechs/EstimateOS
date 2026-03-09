@@ -23,6 +23,11 @@ function deserialize(data: Record<string, any>): Customer {
   return { ...data, createdAt: ts(data.createdAt), updatedAt: ts(data.updatedAt) } as Customer;
 }
 
+// Firestore rejects undefined values — strip them before any write.
+function stripUndefined(obj: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
 export const CustomerRepository = {
   async getCustomer(id: string): Promise<Customer | null> {
     const snap = await getDoc(ref(id));
@@ -30,7 +35,7 @@ export const CustomerRepository = {
   },
 
   async upsertCustomer(customer: Customer): Promise<void> {
-    await setDoc(ref(customer.id), { ...customer, updatedAt: serverTimestamp() });
+    await setDoc(ref(customer.id), stripUndefined({ ...customer, updatedAt: serverTimestamp() }));
   },
 
   async listCustomers(): Promise<Customer[]> {

@@ -18,7 +18,7 @@ import { useAuth } from './AuthContext';
 import { T, radii, spacing } from '../theme';
 
 export function LoginScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -26,6 +26,7 @@ export function LoginScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   async function handleSubmit() {
     setError('');
@@ -46,6 +47,7 @@ export function LoginScreen() {
     try {
       if (isSignUp) {
         await signUp(email.trim(), password);
+        setMessage('Account created — check your email to verify your address.');
       } else {
         await signIn(email.trim(), password);
       }
@@ -66,6 +68,23 @@ export function LoginScreen() {
     }
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setError('Enter your email address first.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await resetPassword(email.trim());
+      setMessage('Password reset email sent — check your inbox.');
+      setError('');
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not send reset email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <KeyboardAvoidingView
       style={s.flex}
@@ -76,6 +95,7 @@ export function LoginScreen() {
           <Text style={s.title}>EstimateOS</Text>
           <Text style={s.subtitle}>{isSignUp ? 'Create an account' : 'Sign in to continue'}</Text>
 
+          {!!message && <Text style={s.messageBanner}>{message}</Text>}
           {!!error && <Text style={s.error}>{error}</Text>}
 
           <Text style={s.label}>Email</Text>
@@ -101,6 +121,12 @@ export function LoginScreen() {
             secureTextEntry
             editable={!loading}
           />
+
+          {!isSignUp && (
+            <TouchableOpacity style={s.forgotLink} onPress={handleForgotPassword} disabled={loading}>
+              <Text style={s.forgotTxt}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
 
           {isSignUp && (
             <>
@@ -206,10 +232,19 @@ const s = StyleSheet.create({
   },
   toggle: { marginTop: 20, alignItems: 'center' },
   toggleText: { color: T.accent, fontSize: 14 },
+  forgotLink: { alignSelf: 'flex-end', marginTop: -8, marginBottom: 8 },
+  forgotTxt: { color: T.accent, fontSize: 13 },
   error: {
     color: T.red,
     fontSize: 13,
     marginBottom: 16,
     textAlign: 'center',
+  },
+  messageBanner: {
+    color: T.green,
+    fontSize: 13,
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

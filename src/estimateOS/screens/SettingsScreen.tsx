@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AppSettings, AI_CREDITS_LOW_THRESHOLD } from '../models/types';
-import { getSettings, saveSettings } from '../storage/settings';
+import { getSettings, saveSettings, DEFAULT_SETTINGS } from '../storage/settings';
 import { getCredits } from '../storage/aiCredits';
 import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
 import { deriveCapabilities } from '../services/capabilities';
@@ -109,9 +109,15 @@ export function SettingsScreen({ navigation }: any) {
   const { show: showToast, Toast } = useToast();
 
   const load = useCallback(async () => {
-    const [s, bal] = await Promise.all([getSettings(), getCredits()]);
-    setSettings(s);
-    setCreditBalance(bal.balance);
+    try {
+      const [s, bal] = await Promise.all([getSettings(), getCredits()]);
+      setSettings(s);
+      setCreditBalance(bal.balance);
+    } catch {
+      // If Firestore is unreachable or auth isn't ready yet, fall back to
+      // defaults so the screen renders instead of spinning forever.
+      setSettings(prev => prev ?? DEFAULT_SETTINGS);
+    }
   }, []);
 
   useFocusEffect(load);

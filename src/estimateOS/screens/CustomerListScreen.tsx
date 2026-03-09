@@ -20,13 +20,15 @@ function CustomerFormModal({ visible, onSave, onClose }: {
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [nameErr, setNameErr] = useState('');
+  const [saveErr, setSaveErr] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const reset = () => { setName(''); setPhone(''); setEmail(''); setAddress(''); setNameErr(''); };
+  const reset = () => { setName(''); setPhone(''); setEmail(''); setAddress(''); setNameErr(''); setSaveErr(''); };
 
   const save = async () => {
     if (!name.trim()) { setNameErr('Name is required'); return; }
     setSaving(true);
+    setSaveErr('');
     try {
       const now = new Date().toISOString();
       const c: Customer = {
@@ -39,6 +41,8 @@ function CustomerFormModal({ visible, onSave, onClose }: {
       await CustomerRepository.upsertCustomer(c);
       onSave(c);
       reset();
+    } catch (e: any) {
+      setSaveErr(e?.message ?? 'Could not save customer. Please try again.');
     } finally { setSaving(false); }
   };
 
@@ -63,6 +67,7 @@ function CustomerFormModal({ visible, onSave, onClose }: {
             <TextInput style={fm.input} value={email} onChangeText={setEmail} placeholder="email@example.com" placeholderTextColor={T.muted} keyboardType="email-address" autoCapitalize="none" />
             <Text style={fm.label}>Service Address</Text>
             <TextInput style={[fm.input, fm.inputMulti]} value={address} onChangeText={setAddress} placeholder="Street, City, State ZIP" placeholderTextColor={T.muted} multiline numberOfLines={2} textAlignVertical="top" />
+            {!!saveErr && <Text style={fm.saveErr}>{saveErr}</Text>}
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -78,6 +83,7 @@ const fm = StyleSheet.create({
   input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.sm, color: T.text, padding: 12, fontSize: 15 },
   inputMulti: { minHeight: 70, paddingTop: 10 },
   inputErr: { borderColor: T.red }, err: { color: T.red, fontSize: 12, marginTop: 4 },
+  saveErr: { color: T.red, fontSize: 13, marginTop: 16, textAlign: 'center' },
 });
 
 // ─── Filter / sort options ────────────────────────────────────────────────

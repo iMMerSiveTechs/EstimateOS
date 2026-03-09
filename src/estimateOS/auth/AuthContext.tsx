@@ -15,6 +15,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
+  sendPasswordResetEmail,
   UserCredential,
 } from 'firebase/auth';
 import { auth, firebaseConfigured } from '../firebase/config';
@@ -26,6 +27,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<UserCredential>;
   signUp: (email: string, password: string) => Promise<UserCredential>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -63,8 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return firebaseSignOut(auth);
   };
 
+  const resetPassword = (email: string) => {
+    if (!auth) return Promise.reject(new Error('Firebase not configured'));
+    return sendPasswordResetEmail(auth, email);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, firebaseAvailable: firebaseConfigured, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, firebaseAvailable: firebaseConfigured, signIn, signUp, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
