@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.naturalorigins.estimateos",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "NSCameraUsageDescription": "EstimateOS uses the camera to capture site photos for estimates.",
         "NSPhotoLibraryUsageDescription": "EstimateOS accesses your photo library to attach site photos to estimates.",
