@@ -11,11 +11,27 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { Estimate } from '../models/types';
+
+// Firebase v11 rejects undefined values at any nesting level.
+// Strip them recursively before every write (FieldValue sentinels are kept).
+function deepStripUndefined(obj: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.toDate !== 'function' && typeof v._methodName === 'undefined') {
+      out[k] = deepStripUndefined(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
 
 function uid(): string {
   const user = auth.currentUser;
@@ -54,14 +70,21 @@ export const EstimateRepository = {
   },
 
   async upsertEstimate(estimate: Estimate): Promise<void> {
+    // Strip undefined at all nesting levels — Firebase v11 throws on undefined values.
     await setDoc(estimateDoc(estimate.id), {
-      ...estimate,
+      ...deepStripUndefined(estimate),
       updatedAt: serverTimestamp(),
     });
   },
 
   async listEstimates(): Promise<Estimate[]> {
     const q = query(estimatesCol(), orderBy('updatedAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => deserialize(d.data()));
+  },
+
+  async listByCustomer(customerId: string): Promise<Estimate[]> {
+    const q = query(estimatesCol(), where('customerId', '==', customerId), orderBy('updatedAt', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map((d) => deserialize(d.data()));
   },

@@ -23,9 +23,25 @@ function deserialize(data: Record<string, any>): Customer {
   return { ...data, createdAt: ts(data.createdAt), updatedAt: ts(data.updatedAt) } as Customer;
 }
 
-// Firestore rejects undefined values — strip them before any write.
-function stripUndefined(obj: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+// Firestore rejects undefined at any nesting level. Recursively strip undefined
+// while preserving FieldValue sentinels (serverTimestamp, increment, etc.).
+function deepStripUndefined(obj: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (
+      v !== null &&
+      typeof v === 'object' &&
+      !Array.isArray(v) &&
+      typeof v.toDate !== 'function' &&      // not a Firestore Timestamp
+      typeof v._methodName === 'undefined'   // not a FieldValue sentinel
+    ) {
+      out[k] = deepStripUndefined(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
 }
 
 export const CustomerRepository = {
@@ -35,7 +51,7 @@ export const CustomerRepository = {
   },
 
   async upsertCustomer(customer: Customer): Promise<void> {
-    await setDoc(ref(customer.id), stripUndefined({ ...customer, updatedAt: serverTimestamp() }));
+    await setDoc(ref(customer.id), deepStripUndefined({ ...customer, updatedAt: serverTimestamp() }));
   },
 
   async listCustomers(): Promise<Customer[]> {

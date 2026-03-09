@@ -132,8 +132,14 @@ export function SettingsScreen({ navigation }: any) {
 
   const handleSave = async () => {
     setSaving(true);
-    try { await saveSettings(settings); showToast('Saved ✓'); }
-    finally { setSaving(false); }
+    try {
+      await saveSettings(settings);
+      showToast('Saved ✓');
+    } catch (err: any) {
+      showToast(`Save failed: ${err?.message ?? 'unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -255,8 +261,12 @@ export function SettingsScreen({ navigation }: any) {
               [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Seed', onPress: async () => {
-                  const result = await seedSampleData();
-                  showToast(`Added ${result.customers} clients, ${result.estimates} estimates, ${result.invoices} invoices`);
+                  try {
+                    const result = await seedSampleData();
+                    showToast(`Added ${result.customers} clients, ${result.estimates} estimates, ${result.invoices} invoices`);
+                  } catch (err: any) {
+                    showToast(`Seed failed: ${err?.message ?? 'unknown error'}`);
+                  }
                 }},
               ],
             );
@@ -274,8 +284,12 @@ export function SettingsScreen({ navigation }: any) {
               [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Delete Everything', style: 'destructive', onPress: async () => {
-                  await clearPilotData();
-                  showToast('All pilot data cleared');
+                  try {
+                    await clearPilotData();
+                    showToast('All pilot data cleared');
+                  } catch (err: any) {
+                    showToast(`Clear failed: ${err?.message ?? 'unknown error'}`);
+                  }
                 }},
               ],
             );

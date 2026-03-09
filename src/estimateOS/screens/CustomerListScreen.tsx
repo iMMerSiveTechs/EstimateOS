@@ -1,5 +1,5 @@
 // ─── CustomerListScreen ───────────────────────────────────────────────────
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
   SafeAreaView, ActivityIndicator, Alert, Modal, KeyboardAvoidingView,
@@ -112,14 +112,21 @@ export function CustomerListScreen({ navigation }: any) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch]       = useState('');
   const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [sortKey, setSortKey]     = useState<SortKey>('name');
   const [statusFilter, setStatusFilter] = useState<FollowUpStatus | null>(null);
+  const isFirstLoad = useRef(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoad.current) setLoading(true);
+    setLoadError(false);
     try { setCustomers(await CustomerRepository.listCustomers()); }
-    finally { setLoading(false); }
+    catch { setLoadError(true); }
+    finally {
+      isFirstLoad.current = false;
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(load);
@@ -217,6 +224,15 @@ export function CustomerListScreen({ navigation }: any) {
 
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={T.accent} />
+      ) : loadError ? (
+        <View style={s.empty}>
+          <Text style={s.emptyIcon}>⚠️</Text>
+          <Text style={s.emptyTitle}>Couldn't load customers</Text>
+          <Text style={s.emptySub}>Check your connection and tap to retry</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={load}>
+            <Text style={s.emptyBtnTxt}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : filtered.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyIcon}>👤</Text>
@@ -272,7 +288,11 @@ export function CustomerListScreen({ navigation }: any) {
 
       <CustomerFormModal
         visible={showCreate}
-        onSave={c => { setCustomers(prev => [c, ...prev]); setShowCreate(false); }}
+        onSave={c => {
+          setCustomers(prev => [c, ...prev]);
+          setShowCreate(false);
+          navigation.navigate('CustomerDetail', { customerId: c.id });
+        }}
         onClose={() => setShowCreate(false)}
       />
     </SafeAreaView>

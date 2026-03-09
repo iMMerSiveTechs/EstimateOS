@@ -178,6 +178,8 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         });
       }
       navigation.navigate('Invoice', { invoiceId: inv.id });
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not create invoice. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -284,6 +286,20 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           <Text style={s.customerName}>{customer.name}</Text>
           {customer.address && <Text style={s.customerSub}>{customer.address}</Text>}
           {customer.phone && <Text style={s.customerSub}>{customer.phone}</Text>}
+          {((estimate.photos?.length ?? 0) > 0 || aiHistory.length > 0) && (
+            <View style={s.headerBadges}>
+              {(estimate.photos?.length ?? 0) > 0 && (
+                <View style={s.badge}>
+                  <Text style={s.badgeTxt}>📸 {estimate.photos!.length} photo{estimate.photos!.length !== 1 ? 's' : ''}</Text>
+                </View>
+              )}
+              {aiHistory.length > 0 && (
+                <View style={[s.badge, s.badgeAi]}>
+                  <Text style={[s.badgeTxt, s.badgeTxtAi]}>🤖 {aiHistory.length} AI scan{aiHistory.length !== 1 ? 's' : ''}</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Price range */}
@@ -450,6 +466,18 @@ export function EstimateDetailScreen({ route, navigation }: any) {
             <Text style={s.actionIcon}>✏️</Text>
             <Text style={s.actionTxt}>Edit Estimate</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => navigation.navigate('AiSiteAnalysis', { estimateId: estimate.id, verticalId: estimate.verticalId, serviceId: estimate.serviceId })}
+          >
+            <Text style={s.actionIcon}>📸</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.actionTxt}>Site Photos / AI Analysis</Text>
+              {(estimate.photos?.length ?? 0) > 0 && (
+                <Text style={s.actionHint}>{estimate.photos!.length} photo{estimate.photos!.length !== 1 ? 's' : ''} attached</Text>
+              )}
+            </View>
+          </TouchableOpacity>
           <TouchableOpacity style={s.actionBtn} onPress={handleCreateInvoice} disabled={saving}>
             {saving ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>🧾</Text>}
             <Text style={s.actionTxt}>Create Invoice</Text>
@@ -519,6 +547,11 @@ const s = StyleSheet.create({
   estNum: { color: T.sub, fontSize: 12 },
   customerName: { color: T.text, fontSize: 22, fontWeight: '700' },
   customerSub: { color: T.sub, fontSize: 13, marginTop: 3 },
+  headerBadges: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  badge: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  badgeAi: { backgroundColor: T.indigoLo, borderColor: T.indigo },
+  badgeTxt: { color: T.textDim, fontSize: 12, fontWeight: '600' },
+  badgeTxtAi: { color: T.indigoHi },
 
   priceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, alignItems: 'center' },
   priceRange: { color: T.text, fontSize: 26, fontWeight: '800' },

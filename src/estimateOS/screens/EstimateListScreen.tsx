@@ -1,6 +1,6 @@
 // ─── EstimateListScreen ───────────────────────────────────────────────────────
 // All estimates, sorted by most recent. Tap to open detail, + to create new.
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
   SafeAreaView, ActivityIndicator,
@@ -20,13 +20,17 @@ const STATUS_COLOR: Record<string, string> = {
 export function EstimateListScreen({ navigation }: any) {
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [loading, setLoading]     = useState(true);
+  const isFirstLoad = useRef(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoad.current) setLoading(true);
     try {
       const list = await EstimateRepository.listEstimates();
       setEstimates(list);
-    } finally { setLoading(false); }
+    } finally {
+      isFirstLoad.current = false;
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(load);
