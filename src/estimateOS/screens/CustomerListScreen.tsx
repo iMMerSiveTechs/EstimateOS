@@ -265,7 +265,7 @@ export function CustomerListScreen({ navigation }: any) {
                 {item.phone && <Text style={s.sub}>{item.phone}</Text>}
                 {item.email && <Text style={s.sub}>{item.email}</Text>}
                 {item.followUpStatus && (
-                  <View style={[s.statusChip, { borderColor: followUpColor(item.followUpStatus) }]}>
+                  <View style={[s.statusChip, { borderColor: followUpColor(item.followUpStatus), backgroundColor: followUpColor(item.followUpStatus) + '22' }]}>
                     <Text style={[s.statusChipTxt, { color: followUpColor(item.followUpStatus) }]}>
                       {FOLLOW_UP_LABELS[item.followUpStatus]}
                     </Text>
@@ -331,7 +331,7 @@ const s = StyleSheet.create({
   name: { color: T.text, fontSize: 16, fontWeight: '600' },
   company: { color: T.sub, fontSize: 12, marginTop: 1 },
   sub: { color: T.sub, fontSize: 13, marginTop: 2 },
-  statusChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: radii.xs, paddingHorizontal: 7, paddingVertical: 3, marginTop: 6 },
+  statusChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: radii.sm, paddingHorizontal: 7, paddingVertical: 3, marginTop: 6 },
   statusChipTxt: { fontSize: 11, fontWeight: '700' },
   nextAction: { color: T.muted, fontSize: 11, marginTop: 2 },
   arrow: { color: T.sub, fontSize: 22 },

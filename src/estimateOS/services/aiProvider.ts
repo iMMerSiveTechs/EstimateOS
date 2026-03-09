@@ -14,7 +14,7 @@
  */
 
 import { SuggestedAdjustment, AiAnalysisRecord } from '../models/types';
-import { ServiceResult, ok, stubMode, blocked, offline } from './ServiceResult';
+import { ServiceResult, ok, providerError, blocked, offline } from './ServiceResult';
 import { checkAiAccess, AiAccessOptions, AiAccessResult } from '../domain/aiGuard';
 import { isAiProviderReady } from './capabilities';
 import { makeId } from '../domain/id';

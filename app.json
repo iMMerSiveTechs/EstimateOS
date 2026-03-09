@@ -13,6 +13,7 @@
     },
     "ios": {
       "supportsTablet": false,
+      "buildNumber": "12",
       "bundleIdentifier": "com.naturalorigins.estimateos",
       "infoPlist": {
         "NSCameraUsageDescription": "EstimateOS uses the camera to capture site photos for estimates.",
@@ -29,6 +30,7 @@
         "backgroundColor": "#0B0F1A"
       },
       "package": "com.naturalorigins.estimateos",
+      "versionCode": 11,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",

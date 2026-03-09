@@ -34,6 +34,7 @@ import {
 } from '../domain/aiGuard';
 import { CreditPurchaseModal } from '../components/CreditPurchaseModal';
 import { isStripeReady } from '../services/capabilities';
+import { runAiAnalysis } from '../services/aiProvider';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -678,9 +679,10 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
     setMapsGrounding(shouldUseMapGrounding(t));
   };
 
-  // Phase 0: run local simulation, no credit deduction, no history write.
-  // Guard checks run even in demo mode so the UI is consistent for Phase 2+.
-  const runAnalysis = (useLastJobs = false) => {
+  // Run analysis: tries real Gemini via aiProvider, falls back to local
+  // simulation on any failure (quota, network, parse, config).
+  // Guard checks run in all modes for Phase 2+ consistency.
+  const runAnalysis = async (useLastJobs = false) => {
     const currentJobs = useLastJobs ? lastJobsRef.current : getJobs();
     if (currentJobs.length === 0) {
       Alert.alert('No media', 'Add at least one photo or video to analyze.');
@@ -708,22 +710,39 @@ export function AiSiteAnalysisScreen({ navigation, route }: any) {
     setFailureMessage(null);
     lastJobsRef.current = currentJobs;
 
-    // Build simulated result immediately and show ResultModal.
-    // This makes the demo feel real — all the UI infrastructure (confidence bars,
-    // evidence cards, Apply to Estimate button) is already production-ready.
+    // Collect processed image URIs from ready jobs.
+    const readyUris = currentJobs
+      .filter(j => j.status === 'ready')
+      .map(j => j.outputUri ?? j.uri);
+
+    // Launch Gemini call immediately — runs concurrently with phase animation.
+    // runAiAnalysis never throws; on any failure it returns a stub result.
+    const geminiPromise = runAiAnalysis(
+      {
+        imageUris: readyUris,
+        focusPrompt: focusPrompt || undefined,
+        verticalId: vertical?.id,
+      },
+      { credits, creditSettings, requireCredits: false },
+    );
+
     setAnalyzing(true);
     setAnalysisPhase(ANALYSIS_PHASES[0]);
 
-    // Cycle through phases for realistic UX feel, then show results.
+    // Cycle through phases for UX feel. Last phase ("Finalizing report…")
+    // stays visible while awaiting the Gemini response if it's still in flight.
     let phaseIdx = 0;
-    const phaseInterval = setInterval(() => {
+    const phaseInterval = setInterval(async () => {
       phaseIdx += 1;
       if (phaseIdx < ANALYSIS_PHASES.length) {
         setAnalysisPhase(ANALYSIS_PHASES[phaseIdx]);
       } else {
         clearInterval(phaseInterval);
-        const simResult = buildSimulatedResult(currentJobs, focusPrompt, vertical);
-        setResult(simResult);
+        // Await real Gemini result (may already be resolved, or still pending).
+        // If provider returned data, use it; otherwise fall back to simulation.
+        const serviceResult = await geminiPromise;
+        const record = serviceResult.data ?? buildSimulatedResult(currentJobs, focusPrompt, vertical);
+        setResult(record);
         setAnalyzing(false);
         setShowResult(true);
       }

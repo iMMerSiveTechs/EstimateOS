@@ -74,21 +74,28 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export async function getSettings(): Promise<AppSettings> {
-  const snap = await getDoc(settingsRef());
-  if (!snap.exists()) return DEFAULT_SETTINGS;
-  // Deep merge so missing keys fall back to defaults
-  const stored = snap.data() as Partial<AppSettings>;
-  return {
-    ...DEFAULT_SETTINGS,
-    ...stored,
-    businessProfile: { ...DEFAULT_SETTINGS.businessProfile, ...stored.businessProfile },
-    exportSettings:  { ...DEFAULT_SETTINGS.exportSettings,  ...stored.exportSettings },
-    pricingDefaults: { ...DEFAULT_SETTINGS.pricingDefaults, ...stored.pricingDefaults },
-    aiFeatures:      { ...DEFAULT_SETTINGS.aiFeatures,      ...stored.aiFeatures },
-    integrations:    { ...DEFAULT_SETTINGS.integrations,    ...stored.integrations },
-    emailTemplate:   { ...DEFAULT_SETTINGS.emailTemplate,   ...stored.emailTemplate },
-    presets: stored.presets ?? DEFAULT_SETTINGS.presets,
-  };
+  try {
+    const snap = await getDoc(settingsRef());
+    if (!snap.exists()) return DEFAULT_SETTINGS;
+    // Deep merge so missing keys fall back to defaults
+    const stored = snap.data() as Partial<AppSettings>;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      businessProfile: { ...DEFAULT_SETTINGS.businessProfile, ...stored.businessProfile },
+      exportSettings:  { ...DEFAULT_SETTINGS.exportSettings,  ...stored.exportSettings },
+      pricingDefaults: { ...DEFAULT_SETTINGS.pricingDefaults, ...stored.pricingDefaults },
+      aiFeatures:      { ...DEFAULT_SETTINGS.aiFeatures,      ...stored.aiFeatures },
+      integrations:    { ...DEFAULT_SETTINGS.integrations,    ...stored.integrations },
+      emailTemplate:   { ...DEFAULT_SETTINGS.emailTemplate,   ...stored.emailTemplate },
+      presets: stored.presets ?? DEFAULT_SETTINGS.presets,
+    };
+  } catch {
+    // Firestore unreachable (offline, auth not ready, permission denied).
+    // Return defaults so callers never crash — settings screen and capability
+    // checks both depend on this function returning a valid object.
+    return DEFAULT_SETTINGS;
+  }
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {

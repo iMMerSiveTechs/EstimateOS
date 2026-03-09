@@ -389,7 +389,7 @@ export function OperationsDashboardScreen({ navigation }: any) {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
   scroll: { padding: 20, paddingBottom: 60 },
-  screenTitle: { color: T.text, fontSize: 28, fontWeight: '800', marginBottom: 20 },
+  screenTitle: { color: T.text, fontSize: 28, fontWeight: '800', marginBottom: 12 },
   quickActions: { flexDirection: 'row', gap: 10, marginBottom: 4 },
   quickBtn: { flex: 1, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: T.border },
   quickIcon: { fontSize: 22, marginBottom: 4 },
