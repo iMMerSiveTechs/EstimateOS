@@ -179,10 +179,14 @@ export function CustomerListScreen({ navigation }: any) {
   const followUpColor = (status?: FollowUpStatus) => {
     if (!status) return T.border;
     if (status === 'won') return T.green;
-    if (status === 'lost') return T.muted;
+    if (status === 'lost') return T.sub;
     if (status === 'follow_up_due') return T.amber;
-    if (status === 'quote_sent') return T.accent;
-    return T.border;
+    if (status === 'quote_sent') return T.teal;
+    if (status === 'lead_new') return T.indigo;
+    if (status === 'quote_in_progress') return T.amber;
+    if (status === 'awaiting_customer') return T.amber;
+    if (status === 'appointment_scheduled') return T.purple;
+    return T.sub;
   };
 
   return (
