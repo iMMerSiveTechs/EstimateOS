@@ -38,7 +38,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 const sb = StyleSheet.create({
-  wrap: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
+  wrap: { borderRadius: radii.sm, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
   txt:  { fontSize: 12, fontWeight: '700' },
 });
 
@@ -482,72 +482,74 @@ export function InvoiceScreen({ route, navigation }: any) {
 
         {/* Actions */}
         <SectionHeader title="Actions" />
-        <TouchableOpacity style={s.shareBtn} onPress={handleSendInvoice} disabled={generatingPdf}>
-          {generatingPdf ? <ActivityIndicator color={T.text} /> : <Text style={s.shareBtnTxt}>📤 Send Invoice</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[s.shareBtn, { marginTop: 10 }]} onPress={handleExportPdf} disabled={generatingPdf}>
-          {generatingPdf ? <ActivityIndicator color={T.text} /> : <Text style={s.shareBtnTxt}>📄 Export PDF</Text>}
-        </TouchableOpacity>
-
-        {/* Payment reminder (when sent/partially_paid/overdue) */}
-        {canReceivePayment && (
-          <TouchableOpacity style={[s.actionBtn, s.actionBtnAmber, { marginTop: 10 }]} onPress={handlePaymentReminder} disabled={generatingPdf}>
-            <Text style={[s.actionBtnTxt, { color: T.amberHi }]}>💬 Send Payment Reminder</Text>
+        <View style={s.actionsGroup}>
+          <TouchableOpacity style={s.primaryBtn} onPress={handleSendInvoice} disabled={generatingPdf}>
+            {generatingPdf ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnTxt}>📤 Send Invoice</Text>}
           </TouchableOpacity>
-        )}
 
-        {/* Draft → Sent (manual status, if not using Send Invoice flow) */}
-        {invoice.status === 'draft' && (
-          <TouchableOpacity style={[s.actionBtn, { marginTop: 10 }]} onPress={() => markStatus('sent')} disabled={saving}>
-            {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Sent</Text>}
+          <TouchableOpacity style={s.shareBtn} onPress={handleExportPdf} disabled={generatingPdf}>
+            {generatingPdf ? <ActivityIndicator color={T.text} /> : <Text style={s.shareBtnTxt}>📄 Export PDF</Text>}
           </TouchableOpacity>
-        )}
 
-        {/* Record partial / full payment */}
-        {canReceivePayment && (
-          <TouchableOpacity style={[s.actionBtn, s.actionBtnGreen, { marginTop: 10 }]} onPress={() => setShowRecordPayment(true)} disabled={saving}>
-            <Text style={[s.actionBtnTxt, { color: '#fff' }]}>💵 Record Payment</Text>
+          {/* Payment reminder (when sent/partially_paid/overdue) */}
+          {canReceivePayment && (
+            <TouchableOpacity style={[s.actionBtn, s.actionBtnAmber]} onPress={handlePaymentReminder} disabled={generatingPdf}>
+              <Text style={[s.actionBtnTxt, { color: T.amberHi }]}>💬 Send Payment Reminder</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Draft → Sent (manual status, if not using Send Invoice flow) */}
+          {invoice.status === 'draft' && (
+            <TouchableOpacity style={s.actionBtn} onPress={() => markStatus('sent')} disabled={saving}>
+              {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Sent</Text>}
+            </TouchableOpacity>
+          )}
+
+          {/* Record partial / full payment */}
+          {canReceivePayment && (
+            <TouchableOpacity style={[s.actionBtn, s.actionBtnGreen]} onPress={() => setShowRecordPayment(true)} disabled={saving}>
+              <Text style={[s.actionBtnTxt, { color: '#fff' }]}>💵 Record Payment</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Quick mark fully paid (when sent/overdue and no partial yet) */}
+          {(invoice.status === 'sent' || invoice.status === 'overdue') && amountPaid === 0 && (
+            <TouchableOpacity style={s.actionBtn} onPress={() => markStatus('paid')} disabled={saving}>
+              {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Fully Paid ✓</Text>}
+            </TouchableOpacity>
+          )}
+
+          {/* Mark overdue (when sent) */}
+          {invoice.status === 'sent' && (
+            <TouchableOpacity style={[s.actionBtn, s.actionBtnAmber]} onPress={markOverdue} disabled={saving}>
+              <Text style={[s.actionBtnTxt, { color: T.amberHi }]}>⚠️ Mark as Overdue</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Void */}
+          {(invoice.status === 'draft' || invoice.status === 'sent' || invoice.status === 'overdue') && (
+            <TouchableOpacity style={s.deleteBtn} onPress={() => Alert.alert(
+              'Void Invoice',
+              'Voiding marks this invoice as cancelled. It will not be deleted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Void', style: 'destructive', onPress: async () => {
+                  const now = new Date().toISOString();
+                  await save({ status: 'void', voidedAt: now });
+                }},
+              ]
+            )} disabled={saving}>
+              <Text style={s.deleteBtnTxt}>Void Invoice</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={s.deleteBtn} onPress={() => Alert.alert('Delete Invoice', 'Delete this invoice?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: async () => { await InvoiceRepository.deleteInvoice(invoiceId); navigation.goBack(); }},
+          ])}>
+            <Text style={s.deleteBtnTxt}>Delete Invoice</Text>
           </TouchableOpacity>
-        )}
-
-        {/* Quick mark fully paid (when sent/overdue and no partial yet) */}
-        {(invoice.status === 'sent' || invoice.status === 'overdue') && amountPaid === 0 && (
-          <TouchableOpacity style={[s.actionBtn, { marginTop: 10 }]} onPress={() => markStatus('paid')} disabled={saving}>
-            {saving ? <ActivityIndicator color={T.accent} /> : <Text style={s.actionBtnTxt}>Mark as Fully Paid ✓</Text>}
-          </TouchableOpacity>
-        )}
-
-        {/* Mark overdue (when sent) */}
-        {invoice.status === 'sent' && (
-          <TouchableOpacity style={[s.actionBtn, s.actionBtnAmber, { marginTop: 10 }]} onPress={markOverdue} disabled={saving}>
-            <Text style={[s.actionBtnTxt, { color: T.amberHi }]}>⚠️ Mark as Overdue</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Void */}
-        {(invoice.status === 'draft' || invoice.status === 'sent' || invoice.status === 'overdue') && (
-          <TouchableOpacity style={[s.deleteBtn, { marginTop: 10 }]} onPress={() => Alert.alert(
-            'Void Invoice',
-            'Voiding marks this invoice as cancelled. It will not be deleted.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Void', style: 'destructive', onPress: async () => {
-                const now = new Date().toISOString();
-                await save({ status: 'void', voidedAt: now });
-              }},
-            ]
-          )} disabled={saving}>
-            <Text style={s.deleteBtnTxt}>Void Invoice</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={[s.deleteBtn, { marginTop: 10 }]} onPress={() => Alert.alert('Delete Invoice', 'Delete this invoice?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: async () => { await InvoiceRepository.deleteInvoice(invoiceId); navigation.goBack(); }},
-        ])}>
-          <Text style={s.deleteBtnTxt}>Delete Invoice</Text>
-        </TouchableOpacity>
+        </View>
 
       </ScrollView>
 
@@ -635,6 +637,9 @@ const s = StyleSheet.create({
   paymentEventMeta: { color: T.sub, fontSize: 12, marginTop: 2 },
   paymentEventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: T.green },
   // Actions
+  actionsGroup: { gap: 10 },
+  primaryBtn: { backgroundColor: T.accent, borderRadius: radii.lg, paddingVertical: 16, alignItems: 'center' },
+  primaryBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 16 },
   shareBtn: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: radii.md, padding: 14, alignItems: 'center' },
   shareBtnTxt: { color: T.text, fontWeight: '600', fontSize: 15 },
   actionBtn: { borderWidth: 1, borderColor: T.accent, borderRadius: radii.md, padding: 14, alignItems: 'center' },

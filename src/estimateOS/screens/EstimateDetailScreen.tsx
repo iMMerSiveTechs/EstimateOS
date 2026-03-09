@@ -36,7 +36,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 const sb = StyleSheet.create({
-  wrap: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
+  wrap: { borderRadius: radii.sm, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
   txt:  { fontSize: 12, fontWeight: '700' },
 });
 
@@ -542,7 +542,7 @@ const s = StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 60 },
   notFound: { color: T.sub, fontSize: 16, textAlign: 'center', marginTop: 60 },
 
-  headerCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border },
+  headerCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 18, borderWidth: 1, borderColor: T.border },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   estNum: { color: T.sub, fontSize: 12 },
   customerName: { color: T.text, fontSize: 22, fontWeight: '700' },
@@ -553,8 +553,8 @@ const s = StyleSheet.create({
   badgeTxt: { color: T.textDim, fontSize: 12, fontWeight: '600' },
   badgeTxtAi: { color: T.indigoHi },
 
-  priceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, alignItems: 'center' },
-  priceRange: { color: T.text, fontSize: 26, fontWeight: '800' },
+  priceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1, borderColor: T.border, alignItems: 'center' },
+  priceRange: { color: T.text, fontSize: 28, fontWeight: '800' },
   edited: { color: T.amberHi, fontSize: 12, fontWeight: '600', marginTop: 4 },
   priceSub: { color: T.sub, fontSize: 12, marginTop: 4 },
 
@@ -563,7 +563,7 @@ const s = StyleSheet.create({
   statusBtnTxt: { color: T.sub, fontSize: 13, fontWeight: '600' },
 
   driverRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
-  driverLabel: { color: T.textDim, fontSize: 14 },
+  driverLabel: { color: T.text, fontSize: 14 },
   driverExplanation: { color: T.sub, fontSize: 12, lineHeight: 17, marginTop: 4 },
   driverAmt: { color: T.text, fontSize: 13, fontWeight: '600' },
   driverChevron: { color: T.muted, fontSize: 9, marginTop: 4 },
@@ -579,7 +579,7 @@ const s = StyleSheet.create({
   nextStepSub: { color: T.sub, fontSize: 12, marginTop: 2, lineHeight: 17 },
 
   actions: { gap: 10 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, borderWidth: 1, borderColor: T.border },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, borderWidth: 1, borderColor: T.border },
   actionBtnDanger: { borderColor: T.redLo },
   actionIcon: { fontSize: 20 },
   actionTxt: { color: T.text, fontSize: 15, fontWeight: '600' },

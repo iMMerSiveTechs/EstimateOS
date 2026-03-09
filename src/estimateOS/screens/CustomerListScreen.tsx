@@ -265,9 +265,11 @@ export function CustomerListScreen({ navigation }: any) {
                 {item.phone && <Text style={s.sub}>{item.phone}</Text>}
                 {item.email && <Text style={s.sub}>{item.email}</Text>}
                 {item.followUpStatus && (
-                  <Text style={[s.statusTag, { color: followUpColor(item.followUpStatus) }]}>
-                    {FOLLOW_UP_LABELS[item.followUpStatus]}
-                  </Text>
+                  <View style={[s.statusChip, { borderColor: followUpColor(item.followUpStatus) }]}>
+                    <Text style={[s.statusChipTxt, { color: followUpColor(item.followUpStatus) }]}>
+                      {FOLLOW_UP_LABELS[item.followUpStatus]}
+                    </Text>
+                  </View>
                 )}
                 {item.nextActionAt && (
                   <Text style={s.nextAction}>
@@ -329,7 +331,8 @@ const s = StyleSheet.create({
   name: { color: T.text, fontSize: 16, fontWeight: '600' },
   company: { color: T.sub, fontSize: 12, marginTop: 1 },
   sub: { color: T.sub, fontSize: 13, marginTop: 2 },
-  statusTag: { fontSize: 11, fontWeight: '700', marginTop: 4 },
+  statusChip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: radii.xs, paddingHorizontal: 7, paddingVertical: 3, marginTop: 6 },
+  statusChipTxt: { fontSize: 11, fontWeight: '700' },
   nextAction: { color: T.muted, fontSize: 11, marginTop: 2 },
   arrow: { color: T.sub, fontSize: 22 },
   fab: { position: 'absolute', bottom: 28, right: 20, width: 52, height: 52, borderRadius: 26, backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
