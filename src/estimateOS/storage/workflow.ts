@@ -23,6 +23,20 @@ function ts(v: any): string {
   return v instanceof Timestamp ? v.toDate().toISOString() : (v ?? new Date().toISOString());
 }
 
+// Firebase v11 throws on undefined values — strip before every write.
+function deepStripUndefined(obj: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.toDate !== 'function' && typeof v._methodName === 'undefined') {
+      out[k] = deepStripUndefined(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 // ─── Reminders ────────────────────────────────────────────────────────────────
 
 function remCol() { return collection(db, 'users', uid(), 'reminders'); }
@@ -39,7 +53,7 @@ function deserReminder(data: Record<string, any>): Reminder {
 
 export const ReminderRepository = {
   async upsertReminder(reminder: Reminder): Promise<void> {
-    await setDoc(remRef(reminder.id), { ...reminder, updatedAt: serverTimestamp() });
+    await setDoc(remRef(reminder.id), { ...deepStripUndefined(reminder), updatedAt: serverTimestamp() });
   },
 
   async listReminders(): Promise<Reminder[]> {
@@ -106,7 +120,7 @@ export const TimelineRepository = {
     const id = makeId();
     const now = new Date().toISOString();
     const full: TimelineEvent = { ...event, id, createdAt: now };
-    await setDoc(doc(db, 'users', uid(), 'timeline', id), full);
+    await setDoc(doc(db, 'users', uid(), 'timeline', id), deepStripUndefined(full));
     return full;
   },
 
@@ -132,7 +146,7 @@ function deserIntake(data: Record<string, any>): IntakeDraft {
 
 export const IntakeDraftRepository = {
   async upsertDraft(draft: IntakeDraft): Promise<void> {
-    await setDoc(intakeRef(draft.id), { ...draft, updatedAt: serverTimestamp() });
+    await setDoc(intakeRef(draft.id), { ...deepStripUndefined(draft), updatedAt: serverTimestamp() });
   },
 
   async getDraft(id: string): Promise<IntakeDraft | null> {
