@@ -19,7 +19,7 @@ function ref(id: string) { return doc(db, 'users', uid(), 'customers', id); }
 
 function deserialize(data: Record<string, any>): Customer {
   const ts = (v: any) =>
-    v instanceof Timestamp ? v.toDate().toISOString() : (v ?? new Date().toISOString());
+    v instanceof Timestamp ? v.toDate().toISOString() : (v ?? undefined);
   return { ...data, createdAt: ts(data.createdAt), updatedAt: ts(data.updatedAt) } as Customer;
 }
 

@@ -265,7 +265,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         note: commIntent === 'estimate_send'
           ? `Estimate ${estimate.estimateNumber ?? ''} sent`
           : commIntent === 'follow_up'
-          ? `Follow-up sent to ${estimate.customer.name}`
+          ? `Follow-up sent to ${estimate.customer?.name ?? ''}`
           : `Communication sent`,
       });
     }
@@ -283,9 +283,9 @@ export function EstimateDetailScreen({ route, navigation }: any) {
             <StatusBadge status={estimate.status} />
             {estimate.estimateNumber && <Text style={s.estNum}>{estimate.estimateNumber}</Text>}
           </View>
-          <Text style={s.customerName}>{customer.name}</Text>
-          {customer.address && <Text style={s.customerSub}>{customer.address}</Text>}
-          {customer.phone && <Text style={s.customerSub}>{customer.phone}</Text>}
+          <Text style={s.customerName}>{customer?.name ?? '—'}</Text>
+          {customer?.address && <Text style={s.customerSub}>{customer.address}</Text>}
+          {customer?.phone && <Text style={s.customerSub}>{customer.phone}</Text>}
           {((estimate.photos?.length ?? 0) > 0 || aiHistory.length > 0) && (
             <View style={s.headerBadges}>
               {(estimate.photos?.length ?? 0) > 0 && (
@@ -453,7 +453,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           <View style={s.nextStepCard}>
             <Text style={s.nextStepIcon}>📞</Text>
             <View style={{ flex: 1 }}>
-              <Text style={s.nextStepTitle}>Follow up with {estimate.customer.name}</Text>
+              <Text style={s.nextStepTitle}>Follow up with {estimate.customer?.name ?? 'customer'}</Text>
               <Text style={s.nextStepSub}>Schedule a reminder or send a follow-up message using the buttons below.</Text>
             </View>
           </View>
@@ -486,7 +486,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
             {generatingPdf ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>📤</Text>}
             <View style={{ flex: 1 }}>
               <Text style={s.actionTxt}>Send Estimate</Text>
-              {!estimate.customer.email && (
+              {!estimate.customer?.email && (
                 <Text style={s.actionHint}>No email on file — you can enter one when sending</Text>
               )}
             </View>
@@ -508,7 +508,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         initial={{
           estimateId: estimate.id,
           customerId: estimate.customerId,
-          customerName: estimate.customer.name,
+          customerName: estimate.customer?.name ?? '',
           type: 'estimate_followup',
         }}
         onClose={() => setShowReminder(false)}
@@ -519,15 +519,15 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         visible={showComm}
         intent={commIntent}
         vars={{
-          customer_name: estimate.customer.name,
+          customer_name: estimate.customer?.name ?? '',
           business_name: undefined,
-          address: estimate.customer.address,
+          address: estimate.customer?.address,
           estimate_number: estimate.estimateNumber,
           price_range: estimate.computedRange
             ? `$${estimate.computedRange.min.toLocaleString('en-US')} – $${estimate.computedRange.max.toLocaleString('en-US')}`
             : undefined,
         }}
-        recipientEmail={estimate.customer.email}
+        recipientEmail={estimate.customer?.email}
         attachments={pdfUri ? [pdfUri] : undefined}
         attachmentLabel={pdfUri ? `Estimate ${estimate.estimateNumber ?? ''} PDF` : undefined}
         onClose={() => { setShowComm(false); setPdfUri(null); }}

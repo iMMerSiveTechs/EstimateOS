@@ -10,6 +10,7 @@
 
 import { AppSettings, IntegrationSettings, AiFeatureSettings } from '../models/types';
 import { getSettings } from '../storage/settings';
+import { firebaseConfigured } from '../firebase/config';
 
 // ─── Capability flags (from a known settings object) ────────────────────────
 
@@ -71,6 +72,7 @@ export async function isMapsReady(): Promise<boolean> {
 }
 
 export async function isAiProviderReady(): Promise<boolean> {
+  if (!firebaseConfigured) return false;
   const settings = await getSettings();
   return settings.integrations.gemini;
 }
