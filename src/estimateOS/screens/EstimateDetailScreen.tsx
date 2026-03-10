@@ -36,7 +36,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 const sb = StyleSheet.create({
-  wrap: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
+  wrap: { borderRadius: radii.sm, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
   txt:  { fontSize: 12, fontWeight: '700' },
 });
 
@@ -265,7 +265,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         note: commIntent === 'estimate_send'
           ? `Estimate ${estimate.estimateNumber ?? ''} sent`
           : commIntent === 'follow_up'
-          ? `Follow-up sent to ${estimate.customer.name}`
+          ? `Follow-up sent to ${estimate.customer?.name ?? ''}`
           : `Communication sent`,
       });
     }
@@ -283,9 +283,9 @@ export function EstimateDetailScreen({ route, navigation }: any) {
             <StatusBadge status={estimate.status} />
             {estimate.estimateNumber && <Text style={s.estNum}>{estimate.estimateNumber}</Text>}
           </View>
-          <Text style={s.customerName}>{customer.name}</Text>
-          {customer.address && <Text style={s.customerSub}>{customer.address}</Text>}
-          {customer.phone && <Text style={s.customerSub}>{customer.phone}</Text>}
+          <Text style={s.customerName}>{customer?.name ?? '—'}</Text>
+          {customer?.address && <Text style={s.customerSub}>{customer.address}</Text>}
+          {customer?.phone && <Text style={s.customerSub}>{customer.phone}</Text>}
           {((estimate.photos?.length ?? 0) > 0 || aiHistory.length > 0) && (
             <View style={s.headerBadges}>
               {(estimate.photos?.length ?? 0) > 0 && (
@@ -453,7 +453,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
           <View style={s.nextStepCard}>
             <Text style={s.nextStepIcon}>📞</Text>
             <View style={{ flex: 1 }}>
-              <Text style={s.nextStepTitle}>Follow up with {estimate.customer.name}</Text>
+              <Text style={s.nextStepTitle}>Follow up with {estimate.customer?.name ?? 'customer'}</Text>
               <Text style={s.nextStepSub}>Schedule a reminder or send a follow-up message using the buttons below.</Text>
             </View>
           </View>
@@ -486,7 +486,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
             {generatingPdf ? <ActivityIndicator size="small" color={T.accent} /> : <Text style={s.actionIcon}>📤</Text>}
             <View style={{ flex: 1 }}>
               <Text style={s.actionTxt}>Send Estimate</Text>
-              {!estimate.customer.email && (
+              {!estimate.customer?.email && (
                 <Text style={s.actionHint}>No email on file — you can enter one when sending</Text>
               )}
             </View>
@@ -508,7 +508,7 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         initial={{
           estimateId: estimate.id,
           customerId: estimate.customerId,
-          customerName: estimate.customer.name,
+          customerName: estimate.customer?.name ?? '',
           type: 'estimate_followup',
         }}
         onClose={() => setShowReminder(false)}
@@ -519,15 +519,15 @@ export function EstimateDetailScreen({ route, navigation }: any) {
         visible={showComm}
         intent={commIntent}
         vars={{
-          customer_name: estimate.customer.name,
+          customer_name: estimate.customer?.name ?? '',
           business_name: undefined,
-          address: estimate.customer.address,
+          address: estimate.customer?.address,
           estimate_number: estimate.estimateNumber,
           price_range: estimate.computedRange
             ? `$${estimate.computedRange.min.toLocaleString('en-US')} – $${estimate.computedRange.max.toLocaleString('en-US')}`
             : undefined,
         }}
-        recipientEmail={estimate.customer.email}
+        recipientEmail={estimate.customer?.email}
         attachments={pdfUri ? [pdfUri] : undefined}
         attachmentLabel={pdfUri ? `Estimate ${estimate.estimateNumber ?? ''} PDF` : undefined}
         onClose={() => { setShowComm(false); setPdfUri(null); }}
@@ -542,7 +542,7 @@ const s = StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 60 },
   notFound: { color: T.sub, fontSize: 16, textAlign: 'center', marginTop: 60 },
 
-  headerCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border },
+  headerCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 18, borderWidth: 1, borderColor: T.border },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   estNum: { color: T.sub, fontSize: 12 },
   customerName: { color: T.text, fontSize: 22, fontWeight: '700' },
@@ -553,8 +553,8 @@ const s = StyleSheet.create({
   badgeTxt: { color: T.textDim, fontSize: 12, fontWeight: '600' },
   badgeTxtAi: { color: T.indigoHi },
 
-  priceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, alignItems: 'center' },
-  priceRange: { color: T.text, fontSize: 26, fontWeight: '800' },
+  priceCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1, borderColor: T.border, alignItems: 'center' },
+  priceRange: { color: T.text, fontSize: 28, fontWeight: '800' },
   edited: { color: T.amberHi, fontSize: 12, fontWeight: '600', marginTop: 4 },
   priceSub: { color: T.sub, fontSize: 12, marginTop: 4 },
 
@@ -563,7 +563,7 @@ const s = StyleSheet.create({
   statusBtnTxt: { color: T.sub, fontSize: 13, fontWeight: '600' },
 
   driverRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: T.border },
-  driverLabel: { color: T.textDim, fontSize: 14 },
+  driverLabel: { color: T.text, fontSize: 14 },
   driverExplanation: { color: T.sub, fontSize: 12, lineHeight: 17, marginTop: 4 },
   driverAmt: { color: T.text, fontSize: 13, fontWeight: '600' },
   driverChevron: { color: T.muted, fontSize: 9, marginTop: 4 },
@@ -579,7 +579,7 @@ const s = StyleSheet.create({
   nextStepSub: { color: T.sub, fontSize: 12, marginTop: 2, lineHeight: 17 },
 
   actions: { gap: 10 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, borderWidth: 1, borderColor: T.border },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, borderWidth: 1, borderColor: T.border },
   actionBtnDanger: { borderColor: T.redLo },
   actionIcon: { fontSize: 20 },
   actionTxt: { color: T.text, fontSize: 15, fontWeight: '600' },

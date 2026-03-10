@@ -39,12 +39,17 @@ function uid(): string {
   return user.uid;
 }
 
+function ensureDb() {
+  if (!db) throw new Error('[EstimateRepository] Firestore not initialized — check Firebase config.');
+  return db;
+}
+
 function estimatesCol() {
-  return collection(db, 'users', uid(), 'estimates');
+  return collection(ensureDb(), 'users', uid(), 'estimates');
 }
 
 function estimateDoc(estimateId: string) {
-  return doc(db, 'users', uid(), 'estimates', estimateId);
+  return doc(ensureDb(), 'users', uid(), 'estimates', estimateId);
 }
 
 // Firestore stores dates as Timestamps; convert back to ISO strings on read

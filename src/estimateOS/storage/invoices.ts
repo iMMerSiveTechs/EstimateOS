@@ -17,6 +17,21 @@ function uid(): string {
 function col() { return collection(db, 'users', uid(), 'invoices'); }
 function ref(id: string) { return doc(db, 'users', uid(), 'invoices', id); }
 
+// Firebase v11 throws on undefined values at any nesting level.
+// Strip recursively before every write (FieldValue sentinels are kept).
+function deepStripUndefined(obj: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.toDate !== 'function' && typeof v._methodName === 'undefined') {
+      out[k] = deepStripUndefined(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 function deserialize(data: Record<string, any>): Invoice {
   const ts = (v: any) =>
     v instanceof Timestamp ? v.toDate().toISOString() : (v ?? new Date().toISOString());
@@ -40,7 +55,7 @@ export const InvoiceRepository = {
   },
 
   async upsertInvoice(invoice: Invoice): Promise<void> {
-    await setDoc(ref(invoice.id), { ...invoice, updatedAt: serverTimestamp() });
+    await setDoc(ref(invoice.id), { ...deepStripUndefined(invoice), updatedAt: serverTimestamp() });
   },
 
   async listInvoices(): Promise<Invoice[]> {

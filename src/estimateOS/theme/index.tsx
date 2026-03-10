@@ -101,7 +101,7 @@ export const spacing = {
 interface GlassPanelProps { children: React.ReactNode; style?: ViewStyle }
 export function GlassPanel({ children, style }: GlassPanelProps) {
   return (
-    <View style={[{ backgroundColor: T.surface, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: T.border }, style]}>
+    <View style={[{ backgroundColor: T.surface, borderRadius: radii.lg, padding: spacing.lg, borderWidth: 1, borderColor: T.border }, style]}>
       {children}
     </View>
   );
@@ -138,7 +138,7 @@ export function Chip({ label, active = false, onPress, style }: ChipProps) {
         borderColor: active ? T.accent : T.border,
         borderRadius: radii.lg,
         paddingHorizontal: 12,
-        paddingVertical: 7,
+        paddingVertical: 6,
         backgroundColor: active ? T.accentLo : T.surface,
       }, style]}
       onPress={onPress}

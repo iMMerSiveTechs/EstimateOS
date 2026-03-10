@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
+import { getAI, GoogleAIBackend, AI } from 'firebase/ai';
 
 const firebaseConfig = {
   apiKey:            process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -40,6 +41,7 @@ let _auth:      Auth              | null = null;
 let _db:        Firestore         | null = null;
 let _storage:   FirebaseStorage   | null = null;
 let _functions: Functions         | null = null;
+let _ai:        AI                | null = null;
 
 try {
   const isNew = getApps().length === 0;
@@ -53,6 +55,10 @@ try {
   _db        = getFirestore(_app);
   _storage   = getStorage(_app);
   _functions = getFunctions(_app);
+  // Gemini Developer API (free-tier on Spark plan). Uses GoogleAIBackend which
+  // routes calls through the Gemini Developer API using the project's API key.
+  // Switch to VertexAIBackend when upgrading to Blaze/production.
+  _ai        = getAI(_app, { backend: new GoogleAIBackend() });
 } catch (e) {
   console.error('[Firebase] initializeApp failed — app will run in offline/auth-disabled mode:', e);
 }
@@ -62,3 +68,4 @@ export const auth      = _auth;
 export const db        = _db;
 export const storage   = _storage;
 export const functions = _functions;
+export const ai        = _ai;

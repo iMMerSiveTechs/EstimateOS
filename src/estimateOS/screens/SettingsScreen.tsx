@@ -109,14 +109,19 @@ export function SettingsScreen({ navigation }: any) {
   const { show: showToast, Toast } = useToast();
 
   const load = useCallback(async () => {
+    // Load settings and credits independently so a credits failure doesn't
+    // reset previously loaded settings to defaults.
     try {
-      const [s, bal] = await Promise.all([getSettings(), getCredits()]);
+      const s = await getSettings();
       setSettings(s);
+    } catch {
+      setSettings(prev => prev ?? DEFAULT_SETTINGS);
+    }
+    try {
+      const bal = await getCredits();
       setCreditBalance(bal.balance);
     } catch {
-      // If Firestore is unreachable or auth isn't ready yet, fall back to
-      // defaults so the screen renders instead of spinning forever.
-      setSettings(prev => prev ?? DEFAULT_SETTINGS);
+      // credit balance stays at 0; non-fatal
     }
   }, []);
 

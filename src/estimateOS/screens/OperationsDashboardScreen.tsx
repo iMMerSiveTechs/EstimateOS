@@ -48,7 +48,7 @@ function StatCard({ label, value, sub, color, onPress }: { label: string; value:
   );
 }
 const stat = StyleSheet.create({
-  card: { flex: 1, backgroundColor: T.surface, borderRadius: radii.lg, padding: 14, borderWidth: 1, alignItems: 'center' },
+  card: { flex: 1, backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, alignItems: 'center' },
   value: { fontSize: 28, fontWeight: '800' },
   label: { color: T.textDim, fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' },
   sub: { color: T.muted, fontSize: 11, marginTop: 2, textAlign: 'center' },
@@ -195,6 +195,9 @@ export function OperationsDashboardScreen({ navigation }: any) {
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.scroll}>
+
+        {/* Screen title */}
+        <Text style={s.screenTitle}>Operations</Text>
 
         {/* Quick action strip */}
         <View style={s.quickActions}>
@@ -386,13 +389,14 @@ export function OperationsDashboardScreen({ navigation }: any) {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
   scroll: { padding: 20, paddingBottom: 60 },
+  screenTitle: { color: T.text, fontSize: 28, fontWeight: '800', marginBottom: 12 },
   quickActions: { flexDirection: 'row', gap: 10, marginBottom: 4 },
-  quickBtn: { flex: 1, backgroundColor: T.surface, borderRadius: radii.md, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: T.border },
+  quickBtn: { flex: 1, backgroundColor: T.surface, borderRadius: radii.md, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: T.border },
   quickIcon: { fontSize: 22, marginBottom: 4 },
   quickTxt: { color: T.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   statRow: { flexDirection: 'row', gap: 10 },
   pipelineScroll: { marginHorizontal: -20, paddingHorizontal: 20 },
-  pipelineCard: { borderRadius: radii.lg, padding: 14, borderWidth: 1, marginRight: 10, minWidth: 90, alignItems: 'center' },
+  pipelineCard: { borderRadius: radii.lg, padding: 16, borderWidth: 1, marginRight: 10, minWidth: 100, alignItems: 'center' },
   pipelineCount: { fontSize: 28, fontWeight: '800' },
   pipelineLabel: { fontSize: 11, fontWeight: '600', marginTop: 4, textAlign: 'center' },
   roiCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, flexDirection: 'row', gap: 20 },

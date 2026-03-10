@@ -96,6 +96,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
     if (emails.length === 0) { setRecipientErr('Enter at least one valid email'); return; }
 
     setSending(true);
+    let navigateBack = false;
     try {
       // Save email template for next time
       await saveEmailTemplate(subject, body);
@@ -119,18 +120,21 @@ export function ReviewSendScreen({ route, navigation }: any) {
             note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
           });
         }
-        navigation.goBack();
+        navigateBack = true;
       } else {
         Alert.alert('Send Issue', result.message ?? 'Could not complete send.');
       }
     } catch (e: any) {
       Alert.alert('Send Failed', e?.message ?? 'Could not send estimate.');
     } finally { setSending(false); }
+    // Navigate after finally so setSending(false) runs on the mounted component.
+    if (navigateBack) navigation.goBack();
   };
 
   const handleShare = async () => {
     if (sending) return;
     setSending(true);
+    let navigateBack = false;
     try {
       await saveEmailTemplate(subject, body);
       const result = await sendUnified({
@@ -140,17 +144,21 @@ export function ReviewSendScreen({ route, navigation }: any) {
         body,
         attachments: pdfUri ? [pdfUri] : undefined,
       });
-      if (result.status === 'success' && estimate.customerId) {
-        await TimelineRepository.appendEvent({
-          customerId: estimate.customerId,
-          estimateId: estimate.id,
-          type: 'estimate_sent',
-          note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
-        });
+      if (result.status === 'success') {
+        if (estimate.customerId) {
+          await TimelineRepository.appendEvent({
+            customerId: estimate.customerId,
+            estimateId: estimate.id,
+            type: 'estimate_sent',
+            note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+          });
+        }
+        navigateBack = true;
       }
     } catch (e: any) {
       Alert.alert('Share Failed', e?.message ?? 'Could not open share sheet.');
     } finally { setSending(false); }
+    if (navigateBack) navigation.goBack();
   };
 
   const { computedRange: range } = estimate;
@@ -254,11 +262,11 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
   scroll: { padding: 20, paddingBottom: 60 },
   notFound: { color: T.sub, fontSize: 16, textAlign: 'center', marginTop: 60 },
-  summaryCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 16, borderWidth: 1, borderColor: T.border, marginBottom: 16, alignItems: 'center' },
+  summaryCard: { backgroundColor: T.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1, borderColor: T.border, marginBottom: 16, alignItems: 'center' },
   summaryLabel: { color: T.sub, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 },
-  summaryName: { color: T.text, fontSize: 20, fontWeight: '700' },
+  summaryName: { color: T.text, fontSize: 22, fontWeight: '700' },
   summaryNum: { color: T.sub, fontSize: 12, marginTop: 4 },
-  summaryRange: { color: T.accent, fontSize: 22, fontWeight: '800', marginTop: 6 },
+  summaryRange: { color: T.green, fontSize: 24, fontWeight: '800', marginTop: 8 },
   // PDF badge
   pdfBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.surface, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: T.border, marginBottom: 16 },
   pdfBadgeTxt: { color: T.sub, fontSize: 12, fontWeight: '500' },
