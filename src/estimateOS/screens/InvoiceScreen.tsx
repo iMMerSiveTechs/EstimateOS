@@ -237,16 +237,24 @@ export function InvoiceScreen({ route, navigation }: any) {
       updatedAt: new Date().toISOString(),
     };
     setInvoice(updated);
-    await InvoiceRepository.upsertInvoice(updated);
+    try {
+      await InvoiceRepository.upsertInvoice(updated);
+    } catch {
+      Alert.alert('Save Failed', 'Could not record payment. Check your connection and try again.');
+      return; // keep modal open so operator can retry
+    }
     setShowRecordPayment(false);
 
+    // Timeline is secondary — a write failure here does not undo the saved payment
     if (invoice.customerId) {
-      await TimelineRepository.appendEvent({
-        customerId: invoice.customerId,
-        invoiceId: invoice.id,
-        type: 'payment_received',
-        note: `$${fmt(event.amount)} received${event.method ? ` via ${event.method}` : ''}`,
-      });
+      try {
+        await TimelineRepository.appendEvent({
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          type: 'payment_received',
+          note: `$${fmt(event.amount)} received${event.method ? ` via ${event.method}` : ''}`,
+        });
+      } catch { /* non-blocking */ }
     }
   };
 

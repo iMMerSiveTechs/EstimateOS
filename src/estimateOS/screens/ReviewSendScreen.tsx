@@ -111,14 +111,16 @@ export function ReviewSendScreen({ route, navigation }: any) {
       });
 
       if (result.status === 'success') {
-        // Log timeline event
+        // Timeline is secondary — a log failure must not misreport a successful send
         if (estimate.customerId) {
-          await TimelineRepository.appendEvent({
-            customerId: estimate.customerId,
-            estimateId: estimate.id,
-            type: 'estimate_sent',
-            note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
-          });
+          try {
+            await TimelineRepository.appendEvent({
+              customerId: estimate.customerId,
+              estimateId: estimate.id,
+              type: 'estimate_sent',
+              note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
+            });
+          } catch { /* non-blocking */ }
         }
         navigateBack = true;
       } else {
@@ -145,13 +147,16 @@ export function ReviewSendScreen({ route, navigation }: any) {
         attachments: pdfUri ? [pdfUri] : undefined,
       });
       if (result.status === 'success') {
+        // Timeline is secondary — a log failure must not misreport a successful share
         if (estimate.customerId) {
-          await TimelineRepository.appendEvent({
-            customerId: estimate.customerId,
-            estimateId: estimate.id,
-            type: 'estimate_sent',
-            note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
-          });
+          try {
+            await TimelineRepository.appendEvent({
+              customerId: estimate.customerId,
+              estimateId: estimate.id,
+              type: 'estimate_sent',
+              note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+            });
+          } catch { /* non-blocking */ }
         }
         navigateBack = true;
       }
