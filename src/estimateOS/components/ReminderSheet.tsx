@@ -7,7 +7,7 @@ import {
   Modal, ScrollView, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import { Reminder, ReminderType, REMINDER_TYPE_LABELS } from '../models/types';
-import { ReminderRepository } from '../storage/workflow';
+import { ReminderRepository } from '../storage/reminders';
 import { scheduleReminderNotification } from '../services/notificationService';
 import { T, radii } from '../theme';
 

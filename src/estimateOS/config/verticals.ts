@@ -1,11 +1,10 @@
 // ─── Built-in vertical configurations ────────────────────────────────────────
-// Natural Origins Roofing — first live vertical.
 // Roofing-specific pricing rules and intake questions are defined here.
 // For future verticals (HVAC, landscaping, etc.) add new VerticalConfig objects.
 
 import { VerticalConfig } from '../models/types';
 
-// ─── Natural Origins Roofing ─────────────────────────────────────────────────
+// ─── Roofing ──────────────────────────────────────────────────────────────────
 
 const ROOFING_VERTICAL: VerticalConfig = {
   id: 'roofing',

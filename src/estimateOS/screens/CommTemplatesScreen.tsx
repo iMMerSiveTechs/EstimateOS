@@ -15,7 +15,7 @@ const MERGE_FIELD_HINT = '{customer_name}  {business_name}  {estimate_number}  {
 
 const PREVIEW_VARS = {
   customer_name: 'Jane Smith',
-  business_name: 'Natural Origins Roofing',
+  business_name: 'Your Company Name',
   estimate_number: 'EST-0042',
   price_range: '$8,500 – $11,200',
   address: '123 Maple St, Austin TX',

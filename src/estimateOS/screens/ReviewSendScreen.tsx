@@ -11,7 +11,7 @@ import { EstimateRepository } from '../storage/repository';
 import { getSettings, saveEmailTemplate } from '../storage/settings';
 import { sendUnified } from '../services/commProvider';
 import { generateEstimatePdf, isPdfAvailable } from '../services/pdfService';
-import { TimelineRepository } from '../storage/workflow';
+import { TimelineRepository } from '../storage/timeline';
 import { T, radii } from '../theme';
 
 function fillTemplate(template: string, vars: Record<string, string>): string {

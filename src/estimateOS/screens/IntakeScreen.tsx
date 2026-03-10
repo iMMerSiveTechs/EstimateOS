@@ -1,14 +1,14 @@
 // ─── IntakeScreen ─────────────────────────────────────────────────────────────
 // Phase 6: Lead capture → customer record + estimate draft + follow-up task.
-// Natural Origins: capture phone calls, site visits, referrals quickly.
+// Capture phone calls, site visits, and referrals quickly.
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { CustomerRepository } from '../storage/customers';
-import { IntakeDraftRepository } from '../storage/workflow';
-import { TimelineRepository } from '../storage/workflow';
+import { IntakeDraftRepository } from '../storage/intakeDrafts';
+import { TimelineRepository } from '../storage/timeline';
 import { Customer, IntakeDraft, LeadUrgency, LEAD_URGENCY_LABELS } from '../models/types';
 import { makeId } from '../domain/id';
 import { T, radii } from '../theme';

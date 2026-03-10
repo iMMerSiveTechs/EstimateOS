@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.naturalorigins.estimateos",
+      "bundleIdentifier": "com.immersivetechs.jobforge",
       "infoPlist": {
         "NSCameraUsageDescription": "EstimateOS uses the camera to capture site photos for estimates.",
         "NSPhotoLibraryUsageDescription": "EstimateOS accesses your photo library to attach site photos to estimates.",
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0F1A"
       },
-      "package": "com.naturalorigins.estimateos",
+      "package": "com.immersivetechs.jobforge",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",

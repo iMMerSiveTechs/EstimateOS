@@ -9,7 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Invoice, InvoiceLineItem, InvoicePaymentEvent, INVOICE_STATUS_LABELS, CommIntent, TimelineEventType } from '../models/types';
 import { InvoiceRepository } from '../storage/invoices';
 import { getBusinessProfile } from '../storage/settings';
-import { TimelineRepository } from '../storage/workflow';
+import { TimelineRepository } from '../storage/timeline';
 import { createInvoicePaymentEvent } from '../services/paymentProvider';
 import { generateInvoicePdf, sharePdf } from '../services/pdfService';
 import { intentToTimelineEvent } from '../services/commProvider';
