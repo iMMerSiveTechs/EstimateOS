@@ -92,7 +92,7 @@ export function LoginScreen() {
     >
       <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
         <View style={s.card}>
-          <Text style={s.title}>EstimateOS</Text>
+          <Text style={s.title}>JobForge</Text>
           <Text style={s.subtitle}>{isSignUp ? 'Create an account' : 'Sign in to continue'}</Text>
 
           {!!message && <Text style={s.messageBanner}>{message}</Text>}

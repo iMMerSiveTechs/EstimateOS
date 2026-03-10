@@ -356,7 +356,7 @@ export function OperationsDashboardScreen({ navigation }: any) {
           if (isFirstRun && checklistDismissed !== false) {
             return (
               <View style={s.firstRunCard}>
-                <Text style={s.firstRunTitle}>Welcome to EstimateOS</Text>
+                <Text style={s.firstRunTitle}>Welcome to JobForge</Text>
                 <Text style={s.firstRunSub}>
                   Start by capturing a lead or creating your first estimate.
                   This dashboard will fill in as you use the app.

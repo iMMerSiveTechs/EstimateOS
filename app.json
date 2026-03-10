@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "EstimateOS",
-    "slug": "estimate-os",
+    "name": "JobForge",
+    "slug": "jobforge",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,11 +15,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.immersivetechs.jobforge",
       "infoPlist": {
-        "NSCameraUsageDescription": "EstimateOS uses the camera to capture site photos for estimates.",
-        "NSPhotoLibraryUsageDescription": "EstimateOS accesses your photo library to attach site photos to estimates.",
-        "NSMicrophoneUsageDescription": "EstimateOS uses the microphone for video recording.",
-        "NSPhotoLibraryAddUsageDescription": "EstimateOS saves site photos to your photo library.",
-        "NSUserNotificationsUsageDescription": "EstimateOS sends reminder notifications for follow-ups, appointments, and invoice reminders.",
+        "NSCameraUsageDescription": "JobForge uses the camera to capture site photos for estimates.",
+        "NSPhotoLibraryUsageDescription": "JobForge accesses your photo library to attach site photos to estimates.",
+        "NSMicrophoneUsageDescription": "JobForge uses the microphone for video recording.",
+        "NSPhotoLibraryAddUsageDescription": "JobForge saves site photos to your photo library.",
+        "NSUserNotificationsUsageDescription": "JobForge sends reminder notifications for follow-ups, appointments, and invoice reminders.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

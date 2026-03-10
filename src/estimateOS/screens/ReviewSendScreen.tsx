@@ -52,7 +52,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
             vertical_name:   est.verticalId,
             price_min:       `$${(est.computedRange?.min ?? 0).toLocaleString('en-US')}`,
             price_max:       `$${(est.computedRange?.max ?? 0).toLocaleString('en-US')}`,
-            business_name:   settings.businessProfile.businessName || 'EstimateOS',
+            business_name:   settings.businessProfile.businessName || 'JobForge',
           };
           if (est.customer.email) setRecipients(est.customer.email);
           setSubject(fillTemplate(settings.emailTemplate.subject, vars));

@@ -126,7 +126,7 @@ export function OnboardingScreen({ onComplete }: Props) {
 
         {/* Header */}
         <View style={s.header}>
-          <Text style={s.logo}>EstimateOS</Text>
+          <Text style={s.logo}>JobForge</Text>
           <Text style={s.tagline}>Set up your workspace</Text>
           <View style={s.progress}>
             {[1, 2, 3].map(n => (

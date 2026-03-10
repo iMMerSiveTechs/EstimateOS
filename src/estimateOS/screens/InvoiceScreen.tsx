@@ -348,7 +348,7 @@ export function InvoiceScreen({ route, navigation }: any) {
     const lines = invoice.lineItems.map(li => `  ${li.label}: $${fmt(li.unitCost * li.quantity)}`).join('\n');
     const text = [
       `INVOICE ${invoice.invoiceNumber}`,
-      `From: ${businessName || 'EstimateOS'}`,
+      `From: ${businessName || 'JobForge'}`,
       `To: ${invoice.customer.name}`,
       `Date: ${new Date(invoice.createdAt).toLocaleDateString()}`,
       `Terms: ${invoice.paymentTerms}`,
