@@ -27,7 +27,7 @@ function deserialize(data: Record<string, any>): CommTemplate {
   return { ...data, updatedAt: ts(data.updatedAt) } as CommTemplate;
 }
 
-// ─── Bundled defaults (Natural Origins roofing) ───────────────────────────────
+// ─── Bundled defaults ─────────────────────────────────────────────────────────
 
 const NOW = new Date().toISOString();
 
@@ -36,7 +36,7 @@ export const DEFAULT_COMM_TEMPLATES: CommTemplate[] = [
     id: 'default_estimate_send',
     name: 'Send Estimate',
     type: 'estimate_send',
-    subject: 'Your roofing estimate — {estimate_number}',
+    subject: 'Your estimate — {estimate_number}',
     body: `Hi {customer_name},
 
 Thank you for the opportunity to provide an estimate for your property at {address}.
@@ -77,10 +77,10 @@ Thank you for your business,
     id: 'default_estimate_followup',
     name: 'Estimate Follow-up',
     type: 'estimate_followup',
-    subject: 'Following up on your roofing estimate — {estimate_number}',
+    subject: 'Following up on your estimate — {estimate_number}',
     body: `Hi {customer_name},
 
-I wanted to follow up on the roofing estimate we prepared for your property at {address}.
+I wanted to follow up on the estimate we prepared for your property at {address}.
 
 Your estimate range: {price_range}
 
@@ -95,7 +95,7 @@ Best,
     id: 'default_appointment_reminder',
     name: 'Appointment Reminder',
     type: 'appointment_reminder',
-    subject: 'Reminder: Your upcoming roofing appointment',
+    subject: 'Reminder: Your upcoming appointment',
     body: `Hi {customer_name},
 
 This is a friendly reminder about your upcoming appointment at {address}.
@@ -114,7 +114,7 @@ Thank you,
     subject: 'Checking in — {customer_name}',
     body: `Hi {customer_name},
 
-I just wanted to check in to see if you have any questions about your estimate or if you're ready to move forward with your roofing project.
+I just wanted to check in to see if you have any questions about your estimate or if you're ready to move forward.
 
 We're here whenever you're ready.
 

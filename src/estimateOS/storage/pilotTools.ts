@@ -13,7 +13,8 @@ import { makeId } from '../domain/id';
 import { CustomerRepository } from './customers';
 import { EstimateRepository } from './repository';
 import { InvoiceRepository } from './invoices';
-import { ReminderRepository, IntakeDraftRepository } from './workflow';
+import { ReminderRepository } from './reminders';
+import { IntakeDraftRepository } from './intakeDrafts';
 import { CommTemplateRepository, DEFAULT_COMM_TEMPLATES } from './commTemplates';
 import {
   Customer, Estimate, Invoice, IntakeDraft, Reminder,

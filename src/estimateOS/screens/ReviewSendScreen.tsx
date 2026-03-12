@@ -11,7 +11,7 @@ import { EstimateRepository } from '../storage/repository';
 import { getSettings, saveEmailTemplate } from '../storage/settings';
 import { sendUnified } from '../services/commProvider';
 import { generateEstimatePdf, isPdfAvailable } from '../services/pdfService';
-import { TimelineRepository } from '../storage/workflow';
+import { TimelineRepository } from '../storage/timeline';
 import { T, radii } from '../theme';
 
 function fillTemplate(template: string, vars: Record<string, string>): string {
@@ -52,7 +52,7 @@ export function ReviewSendScreen({ route, navigation }: any) {
             vertical_name:   est.verticalId,
             price_min:       `$${(est.computedRange?.min ?? 0).toLocaleString('en-US')}`,
             price_max:       `$${(est.computedRange?.max ?? 0).toLocaleString('en-US')}`,
-            business_name:   settings.businessProfile.businessName || 'EstimateOS',
+            business_name:   settings.businessProfile.businessName || 'JobForge',
           };
           if (est.customer.email) setRecipients(est.customer.email);
           setSubject(fillTemplate(settings.emailTemplate.subject, vars));
@@ -111,14 +111,16 @@ export function ReviewSendScreen({ route, navigation }: any) {
       });
 
       if (result.status === 'success') {
-        // Log timeline event
+        // Timeline is secondary — a log failure must not misreport a successful send
         if (estimate.customerId) {
-          await TimelineRepository.appendEvent({
-            customerId: estimate.customerId,
-            estimateId: estimate.id,
-            type: 'estimate_sent',
-            note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
-          });
+          try {
+            await TimelineRepository.appendEvent({
+              customerId: estimate.customerId,
+              estimateId: estimate.id,
+              type: 'estimate_sent',
+              note: `Estimate ${estimate.estimateNumber ?? ''} sent to ${emails.join(', ')}`,
+            });
+          } catch { /* non-blocking */ }
         }
         navigateBack = true;
       } else {
@@ -145,13 +147,16 @@ export function ReviewSendScreen({ route, navigation }: any) {
         attachments: pdfUri ? [pdfUri] : undefined,
       });
       if (result.status === 'success') {
+        // Timeline is secondary — a log failure must not misreport a successful share
         if (estimate.customerId) {
-          await TimelineRepository.appendEvent({
-            customerId: estimate.customerId,
-            estimateId: estimate.id,
-            type: 'estimate_sent',
-            note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
-          });
+          try {
+            await TimelineRepository.appendEvent({
+              customerId: estimate.customerId,
+              estimateId: estimate.id,
+              type: 'estimate_sent',
+              note: `Estimate ${estimate.estimateNumber ?? ''} shared`,
+            });
+          } catch { /* non-blocking */ }
         }
         navigateBack = true;
       }

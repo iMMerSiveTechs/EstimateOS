@@ -7,7 +7,7 @@ import {
   Modal, ScrollView, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import { Reminder, ReminderType, REMINDER_TYPE_LABELS } from '../models/types';
-import { ReminderRepository } from '../storage/workflow';
+import { ReminderRepository } from '../storage/reminders';
 import { scheduleReminderNotification } from '../services/notificationService';
 import { T, radii } from '../theme';
 
@@ -79,7 +79,7 @@ export function ReminderSheet({ visible, initial, onClose, onSaved }: Props) {
       if (permissionStatus === 'denied') {
         Alert.alert(
           'Reminder saved',
-          'Notifications are turned off for EstimateOS. Your reminder is saved and visible in the app — enable notifications in Settings to receive device alerts.',
+          'Notifications are turned off for JobForge. Your reminder is saved and visible in the app — enable notifications in Settings to receive device alerts.',
           [{ text: 'OK' }],
         );
       }

@@ -1,6 +1,6 @@
 // ─── OperationsDashboardScreen ────────────────────────────────────────────────
 // Phases 6, 7, 8: Ops overview, needs-attention, pipeline, ROI surfaces.
-// Natural Origins proving ground — lightweight, action-oriented, local-first.
+// Lightweight, action-oriented, local-first.
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -11,7 +11,8 @@ import { Estimate, Invoice, Customer, Reminder, IntakeDraft, FollowUpStatus, FOL
 import { EstimateRepository } from '../storage/repository';
 import { InvoiceRepository } from '../storage/invoices';
 import { CustomerRepository } from '../storage/customers';
-import { ReminderRepository, IntakeDraftRepository } from '../storage/workflow';
+import { ReminderRepository } from '../storage/reminders';
+import { IntakeDraftRepository } from '../storage/intakeDrafts';
 import { getSettings } from '../storage/settings';
 import { cancelScheduledNotification } from '../services/notificationService';
 import { GettingStartedChecklist, useGettingStartedDismissed, ChecklistContext } from '../components/GettingStartedChecklist';
@@ -355,7 +356,7 @@ export function OperationsDashboardScreen({ navigation }: any) {
           if (isFirstRun && checklistDismissed !== false) {
             return (
               <View style={s.firstRunCard}>
-                <Text style={s.firstRunTitle}>Welcome to EstimateOS</Text>
+                <Text style={s.firstRunTitle}>Welcome to JobForge</Text>
                 <Text style={s.firstRunSub}>
                   Start by capturing a lead or creating your first estimate.
                   This dashboard will fill in as you use the app.

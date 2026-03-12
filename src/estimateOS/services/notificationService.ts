@@ -84,7 +84,7 @@ function buildTitle(reminder: Reminder): string {
 function buildBody(reminder: Reminder): string {
   if (reminder.note) return reminder.note;
   if (reminder.customerName) return `Action needed for ${reminder.customerName}.`;
-  return 'Tap to open EstimateOS.';
+  return 'Tap to open JobForge.';
 }
 
 // Notifications fire at 9:00 AM local time on the due date

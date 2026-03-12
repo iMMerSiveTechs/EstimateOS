@@ -153,7 +153,7 @@ export function SettingsScreen({ navigation }: any) {
 
         {/* ── Business Profile ─────────────────────────────────────────── */}
         <SectionHeader title="Business Profile" />
-        <FieldRow label="Business Name" value={settings.businessProfile.businessName} onChange={v => patchProfile({ businessName: v })} placeholder="Natural Origins Roofing" />
+        <FieldRow label="Business Name" value={settings.businessProfile.businessName} onChange={v => patchProfile({ businessName: v })} placeholder="Your company name" />
         <FieldRow label="Phone" value={settings.businessProfile.phone ?? ''} onChange={v => patchProfile({ phone: v })} keyboard="phone-pad" placeholder="(555) 555-5555" />
         <FieldRow label="Email" value={settings.businessProfile.email ?? ''} onChange={v => patchProfile({ email: v })} keyboard="email-address" placeholder="hello@yourcompany.com" />
         <FieldRow label="Website" value={settings.businessProfile.website ?? ''} onChange={v => patchProfile({ website: v })} keyboard="url" placeholder="https://yourcompany.com" />

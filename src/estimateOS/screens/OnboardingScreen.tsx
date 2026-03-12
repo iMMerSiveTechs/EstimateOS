@@ -1,8 +1,7 @@
 // ─── OnboardingScreen ─────────────────────────────────────────────────────────
 // Phase 10: First-run setup for a new Estimate OS workspace.
 // Collects company profile, vertical selection, and basic defaults.
-// Compatible with current single-company Natural Origins flow —
-// once complete, sets onboarding flag and navigates to main app.
+// Once complete, sets onboarding flag and navigates to main app.
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
@@ -127,7 +126,7 @@ export function OnboardingScreen({ onComplete }: Props) {
 
         {/* Header */}
         <View style={s.header}>
-          <Text style={s.logo}>EstimateOS</Text>
+          <Text style={s.logo}>JobForge</Text>
           <Text style={s.tagline}>Set up your workspace</Text>
           <View style={s.progress}>
             {[1, 2, 3].map(n => (
@@ -150,7 +149,7 @@ export function OnboardingScreen({ onComplete }: Props) {
                 style={[s.input, errors.companyName && s.inputErr]}
                 value={companyName}
                 onChangeText={v => { setCompanyName(v); setErrors(e => ({ ...e, companyName: '' })); }}
-                placeholder="e.g. Natural Origins Roofing"
+                placeholder="e.g. Acme Roofing"
                 placeholderTextColor={T.muted}
                 autoCapitalize="words"
               />

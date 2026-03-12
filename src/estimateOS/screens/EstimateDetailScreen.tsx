@@ -11,7 +11,7 @@ import { InvoiceRepository } from '../storage/invoices';
 import { getAiHistory } from '../storage/aiHistory';
 import { nextInvoiceNumber, getBusinessProfile } from '../storage/settings';
 import { makeId } from '../domain/id';
-import { TimelineRepository } from '../storage/workflow';
+import { TimelineRepository } from '../storage/timeline';
 import { MaterialsSection } from '../components/MaterialsSection';
 import { FollowUpPanel } from '../components/FollowUpPanel';
 import { ReminderSheet } from '../components/ReminderSheet';

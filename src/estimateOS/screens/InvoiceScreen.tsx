@@ -9,7 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Invoice, InvoiceLineItem, InvoicePaymentEvent, INVOICE_STATUS_LABELS, CommIntent, TimelineEventType } from '../models/types';
 import { InvoiceRepository } from '../storage/invoices';
 import { getBusinessProfile } from '../storage/settings';
-import { TimelineRepository } from '../storage/workflow';
+import { TimelineRepository } from '../storage/timeline';
 import { createInvoicePaymentEvent } from '../services/paymentProvider';
 import { generateInvoicePdf, sharePdf } from '../services/pdfService';
 import { intentToTimelineEvent } from '../services/commProvider';
@@ -237,16 +237,24 @@ export function InvoiceScreen({ route, navigation }: any) {
       updatedAt: new Date().toISOString(),
     };
     setInvoice(updated);
-    await InvoiceRepository.upsertInvoice(updated);
+    try {
+      await InvoiceRepository.upsertInvoice(updated);
+    } catch {
+      Alert.alert('Save Failed', 'Could not record payment. Check your connection and try again.');
+      return; // keep modal open so operator can retry
+    }
     setShowRecordPayment(false);
 
+    // Timeline is secondary — a write failure here does not undo the saved payment
     if (invoice.customerId) {
-      await TimelineRepository.appendEvent({
-        customerId: invoice.customerId,
-        invoiceId: invoice.id,
-        type: 'payment_received',
-        note: `$${fmt(event.amount)} received${event.method ? ` via ${event.method}` : ''}`,
-      });
+      try {
+        await TimelineRepository.appendEvent({
+          customerId: invoice.customerId,
+          invoiceId: invoice.id,
+          type: 'payment_received',
+          note: `$${fmt(event.amount)} received${event.method ? ` via ${event.method}` : ''}`,
+        });
+      } catch { /* non-blocking */ }
     }
   };
 
@@ -340,7 +348,7 @@ export function InvoiceScreen({ route, navigation }: any) {
     const lines = invoice.lineItems.map(li => `  ${li.label}: $${fmt(li.unitCost * li.quantity)}`).join('\n');
     const text = [
       `INVOICE ${invoice.invoiceNumber}`,
-      `From: ${businessName || 'EstimateOS'}`,
+      `From: ${businessName || 'JobForge'}`,
       `To: ${invoice.customer.name}`,
       `Date: ${new Date(invoice.createdAt).toLocaleDateString()}`,
       `Terms: ${invoice.paymentTerms}`,
